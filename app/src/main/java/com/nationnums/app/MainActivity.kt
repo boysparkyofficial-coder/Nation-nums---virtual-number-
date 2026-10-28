@@ -2,6 +2,7 @@ package com.nationnums.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -133,6 +134,15 @@ private fun NationNumsApp() {
     var selectedTab by remember { mutableStateOf(AppTab.Home) }
     var selectedPage by remember { mutableStateOf<ServicePage?>(null) }
     var showSignIn by remember { mutableStateOf(false) }
+
+    // Let Android's system Back button close nested screens before leaving the app.
+    BackHandler(enabled = showSignIn || selectedPage != null) {
+        if (showSignIn) {
+            showSignIn = false
+        } else {
+            selectedPage = null
+        }
+    }
 
     Scaffold(
         containerColor = Canvas,

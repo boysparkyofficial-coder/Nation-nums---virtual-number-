@@ -321,6 +321,8 @@ private fun AppLockScreen(
     var confirmPassword by remember(isSetup) { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var enableBiometric by remember { mutableStateOf(false) }
+    var localError by remember(isSetup) { mutableStateOf("") }
+    val visibleError = if (localError.isNotBlank()) localError else errorMessage
 
     Box(
         modifier = Modifier
@@ -408,21 +410,25 @@ private fun AppLockScreen(
                 }
             }
 
-            if (errorMessage.isNotBlank()) {
+            if (visibleError.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
-                Text(errorMessage, color = Color(0xFFB42318), fontSize = 12.sp, lineHeight = 17.sp)
+                Text(visibleError, color = Color(0xFFB42318), fontSize = 12.sp, lineHeight = 17.sp)
             }
 
             Spacer(Modifier.height(17.dp))
             Button(
                 onClick = {
                     if (isSetup) {
-                        if (password != confirmPassword) {
-                            onCreatePassword("", false)
-                        } else {
-                            onCreatePassword(password, enableBiometric)
+                        when {
+                            password.length < 4 -> localError = "Choose an app password with at least 4 characters."
+                            password != confirmPassword -> localError = "The two passwords do not match."
+                            else -> {
+                                localError = ""
+                                onCreatePassword(password, enableBiometric)
+                            }
                         }
                     } else {
+                        localError = ""
                         onUnlockPassword(password)
                     }
                 },

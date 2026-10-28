@@ -32,11 +32,13 @@ internal class Base44SessionStore(context: Context) {
     @Synchronized
     fun saveToken(token: String, rememberMe: Boolean = true) {
         require(token.isNotBlank()) { "Cannot store an empty session token." }
-        transientToken = token
         if (!rememberMe) {
             clearPersistedToken()
+            transientToken = token
             return
         }
+        // Persist successfully before publishing the in-memory session. If encryption
+        // fails, the caller must not observe a partially established login session.
         val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
@@ -45,6 +47,7 @@ internal class Base44SessionStore(context: Context) {
             .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
             .putString(KEY_TOKEN, Base64.encodeToString(encrypted, Base64.NO_WRAP))
             .apply()
+        transientToken = token
     }
 
     @Synchronized

@@ -14,7 +14,7 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 - Users create their own app password; only a salted PBKDF2 hash is stored.
 - Optional biometric unlock is available when the Android device reports a supported enrolled biometric.
 - The app uses its bundled Nation Nums launcher artwork in the app's brand mark. The exact logo asset from the live website still needs verification.
-- A Base44 entity API client scaffold targets the existing Nation Nums app ID; it is not yet wired to sign-in screens or live account data.
+- A native Base44 entity HTTP client now supports authenticated entity reads and record creation using the existing Nation Nums app ID. It requires a valid user access token and is not yet wired to the login flow or feature screens.
 
 ## Not yet integrated
 - Base44 account authentication and Continue with Google.

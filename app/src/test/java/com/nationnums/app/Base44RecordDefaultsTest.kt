@@ -35,4 +35,24 @@ class Base44RecordDefaultsTest {
         assertEquals("", record.body)
         assertEquals("system", record.type)
     }
+    @Test fun missingSmsFieldsUseSafeDefaults() {
+        val record = Base44RecordParser.smsMessage(JSONObject("""{"id":"s1","otp_code":null,"code":"  ","body":null,"message":"  ","sender":null}"""))
+        assertEquals("", record.code)
+        assertEquals("", record.message)
+        assertEquals("", record.sender)
+        assertEquals("", record.createdAt)
+    }
+
+    @Test fun smsParserUsesFallbackKeysAndIgnoresLiteralNull() {
+        val record = Base44RecordParser.smsMessage(JSONObject("""{"id":"s2","otp_code":"null","code":"482913","body":"","message":"Your verification code is 482913","received_at":null,"created_date":"2026-10-28"}"""))
+        assertEquals("482913", record.code)
+        assertEquals("Your verification code is 482913", record.message)
+        assertEquals("2026-10-28", record.createdAt)
+    }
+
+    @Test fun recordParserIgnoresNonObjectArrayEntries() {
+        assertEquals(1, Base44RecordParser.records("""[{"id":"v1"},null,3,"bad"]""").size)
+        assertEquals(0, Base44RecordParser.records("""{"unexpected":"shape"}""").size)
+    }
+
 }

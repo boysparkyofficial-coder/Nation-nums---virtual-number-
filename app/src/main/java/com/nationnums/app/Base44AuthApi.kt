@@ -152,9 +152,9 @@ internal class Base44AuthApi(
                 }.orEmpty()
                 if (status in 200..299) {
                     val json = JSONObject(raw)
-                    val token = json.optString("access_token")
+                    val token = json.optString("access_token").takeUnless { it.isBlank() || it == "null" }.orEmpty()
                     val userJson = json.optJSONObject("user")
-                    if (token.isBlank() || userJson == null) {
+                    if (token.isBlank() || userJson == null || userJson.optString("id").isBlank() || userJson.optString("id") == "null") {
                         Result(false, status, error = "The sign-in response was incomplete. Please try again.")
                     } else {
                         sessionStore.saveToken(token, rememberMe)

@@ -122,6 +122,7 @@ private enum class ServicePage(val title: String, val subtitle: String) {
     Support("Help & support", "Get help with your account"),
     Security("Security", "Protect your Nation Nums account"),
     ApiKeys("API key management", "Manage keys for supported API access"),
+    Team("Team management", "Manage team access and permissions"),
     Telegram("Telegram settings", "Account linking and supported alerts"),
     Faq("Frequently asked questions", "Answers about Nation Nums"),
     Legal("Policies & app information", "Privacy, terms and app details")
@@ -479,6 +480,7 @@ private fun ProfileScreen(
             Spacer(Modifier.height(8.dp))
         }
         item { ServiceRow("API key management", "API documentation is not included in the app", Icons.Rounded.Shield) { onOpen(ServicePage.ApiKeys) } }
+        item { ServiceRow("Team management", "Team members and access permissions", Icons.Rounded.AccountCircle) { onOpen(ServicePage.Team) } }
         item { ServiceRow("Help & support", "Support tickets and contact options", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Support) } }
         item { ServiceRow("FAQs", "Common questions", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Faq) } }
         item { ServiceRow("Policies & app information", "Privacy policy, terms and version", Icons.Rounded.Settings) { onOpen(ServicePage.Legal) } }
@@ -506,6 +508,7 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                 ServicePage.Notifications -> "Your real notifications will appear after account and push-notification integration is completed."
                 ServicePage.Security -> "Security settings will use the existing account system. Passwords and private keys will not be stored in plain text."
                 ServicePage.Support -> "Support ticket history and replies will load after the existing support endpoints are verified."
+                ServicePage.Team -> "Team members, invitations and permissions will be loaded from the existing Nation Nums account after team access is verified."
                 else -> "This page is part of the native app structure. Live data and actions will be enabled after the existing Nation Nums backend is connected and tested."
             })
             Spacer(Modifier.height(18.dp))

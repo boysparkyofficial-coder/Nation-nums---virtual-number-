@@ -83,7 +83,7 @@ internal object Base44RecordParser {
         phoneNumber = json.optString("phone_number"),
         country = json.optString("country"),
         service = json.optString("service"),
-        status = json.optString("status", "unknown"),
+        status = firstNonBlank(json, "status").ifBlank { "unknown" },
         expiresAt = json.optString("expires_at")
     )
 

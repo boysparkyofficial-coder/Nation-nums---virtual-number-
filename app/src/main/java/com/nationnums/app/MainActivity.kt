@@ -431,8 +431,16 @@ private fun OrdersScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         EmptyState(
             icon = Icons.Rounded.History,
-            title = "Your orders will appear here",
-            body = "Sign in to view real purchases, OTP messages, rental status and order history.",
+            title = when (filter) {
+                "Active" -> "No active orders to show"
+                "Completed" -> "No completed orders to show"
+                else -> "Your orders will appear here"
+            },
+            body = when (filter) {
+                "Active" -> "Sign in to check active number activations, rentals and incoming OTP status."
+                "Completed" -> "Sign in to review completed purchases, expired activations and previous orders."
+                else -> "Sign in to view real purchases, OTP messages, rental status and order history."
+            },
             action = "Sign in",
             onAction = onSignIn
         )

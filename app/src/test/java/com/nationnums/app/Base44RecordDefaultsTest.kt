@@ -55,4 +55,18 @@ class Base44RecordDefaultsTest {
         assertEquals(0, Base44RecordParser.records("""{"unexpected":"shape"}""").size)
     }
 
+    @Test fun recordParserSupportsCommonBase44ResponseWrappers() {
+        assertEquals(1, Base44RecordParser.records("""{"data":[{"id":"a1"}]}""").size)
+        assertEquals(1, Base44RecordParser.records("""{"items":[{"id":"a2"}]}""").size)
+        assertEquals(1, Base44RecordParser.records("""{"results":[{"id":"a3"}]}""").size)
+        assertEquals(1, Base44RecordParser.records("""{"records":[{"id":"a4"}]}""").size)
+        assertEquals(1, Base44RecordParser.records("""{"id":"a5"}""").size)
+    }
+
+    @Test fun recordParserReturnsEmptyListForInvalidJson() {
+        assertEquals(0, Base44RecordParser.records("""not-json""").size)
+        assertEquals(0, Base44RecordParser.records("""{"data":null}""").size)
+        assertEquals(0, Base44RecordParser.records("""[null, 42, "text"]""").size)
+    }
+
 }

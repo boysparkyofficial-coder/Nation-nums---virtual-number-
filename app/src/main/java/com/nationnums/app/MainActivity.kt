@@ -931,6 +931,7 @@ private fun ServicesScreen(
     onOpen: (ServicePage) -> Unit,
     onRefresh: () -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
     var query by remember { mutableStateOf("") }
     val services = listOf(
         Triple(ServicePage.VirtualNumbers, "Buy virtual numbers", "Choose a country and service"),
@@ -993,6 +994,14 @@ private fun ServicesScreen(
                                 Text(listOf(number.service, number.country).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Virtual number" }, color = Muted, fontSize = 12.sp)
                             }
                             Text(number.status.replaceFirstChar { it.uppercase() }, color = if (number.status.equals("active", true)) Green else Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        if (number.phoneNumber.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(number.phoneNumber)) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                                Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("Copy number", fontSize = 11.sp)
+                            }
                         }
                         if (number.expiresAt.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
@@ -1132,6 +1141,14 @@ private fun OrdersScreen(
                                     Text(listOf(number.service, number.country).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Virtual number" }, color = Muted, fontSize = 12.sp)
                                 }
                                 Text(number.status.replaceFirstChar { it.uppercase() }, color = if (number.status.equals("active", true)) Green else Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (number.phoneNumber.isNotBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(number.phoneNumber)) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("Copy number", fontSize = 11.sp)
+                                }
                             }
                             if (number.expiresAt.isNotBlank()) {
                                 Spacer(Modifier.height(7.dp))

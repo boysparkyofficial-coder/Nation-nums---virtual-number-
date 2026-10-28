@@ -264,9 +264,21 @@ private fun NationNumsApp(activity: MainActivity) {
         var virtualNumbers by remember { mutableStateOf<List<VirtualNumberRecord>>(emptyList()) }
         var numbersLoading by remember { mutableStateOf(false) }
         var numbersError by remember { mutableStateOf("") }
+        var notifications by remember { mutableStateOf<List<NotificationRecord>>(emptyList()) }
+        var notificationsLoading by remember { mutableStateOf(false) }
+        var notificationsError by remember { mutableStateOf("") }
         val repository = remember { NationNumsRepository { sessionStore.readToken() } }
 
-        LaunchedEffect(signedInUser?.id, selectedTab) {
+        LaunchedEffect(signedInUser?.id, selectedTab, selectedPage) {
+            if (signedInUser != null && selectedPage == ServicePage.Notifications) {
+                notificationsLoading = true
+                notificationsError = ""
+                repository.loadNotifications { result, records ->
+                    notificationsLoading = false
+                    notifications = records
+                    notificationsError = if (result.success) "" else result.error ?: "Could not load notifications."
+                }
+            }
             if (signedInUser != null && selectedTab == AppTab.Numbers) {
                 numbersLoading = true
                 numbersError = ""
@@ -332,7 +344,17 @@ private fun NationNumsApp(activity: MainActivity) {
                 }
             }
         ) { padding ->
-            if (selectedPage != null) {
+            if (selectedPage == ServicePage.Notifications) {
+                NotificationsScreen(
+                    modifier = Modifier.padding(padding),
+                    notifications = notifications,
+                    isLoading = notificationsLoading,
+                    errorMessage = notificationsError,
+                    isSignedIn = signedInUser != null,
+                    onBack = { selectedPage = null },
+                    onSignIn = { showSignIn = true }
+                )
+            } else if (selectedPage != null) {
                 ServiceDetailPage(
                     page = selectedPage!!,
                     onBack = { selectedPage = null },
@@ -1135,6 +1157,87 @@ private fun ProfileScreen(
         item { ServiceRow("Help & support", "Support tickets and contact options", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Support) } }
         item { ServiceRow("FAQs", "Common questions", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Faq) } }
         item { ServiceRow("Policies & app information", "Privacy policy, terms and version", Icons.Rounded.Settings) { onOpen(ServicePage.Legal) } }
+    }
+}
+
+@Composable
+private fun NotificationsScreen(
+    modifier: Modifier = Modifier,
+    notifications: List<NotificationRecord>,
+    isLoading: Boolean,
+    errorMessage: String,
+    isSignedIn: Boolean,
+    onBack: () -> Unit,
+    onSignIn: () -> Unit
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
+                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = NationBlue)
+                Spacer(Modifier.width(8.dp))
+                Text("Back", color = NationBlue, fontWeight = FontWeight.SemiBold)
+            }
+            PageHeader("Notifications", "Updates recorded for your Nation Nums account.")
+        }
+        if (!isSignedIn) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.Notifications,
+                    title = "Sign in to view notifications",
+                    body = "Account notifications appear here after sign-in.",
+                    action = "Sign in",
+                    onAction = onSignIn
+                )
+            }
+        } else if (isLoading) {
+            item { Text("Loading notifications…", color = Muted, fontSize = 13.sp) }
+        } else if (errorMessage.isNotBlank()) {
+            item { InfoNotice(errorMessage) }
+        } else if (notifications.isEmpty()) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.Notifications,
+                    title = "You're all caught up",
+                    body = "New account updates will appear here when the backend records them.",
+                    action = "Back",
+                    onAction = onBack
+                )
+            }
+        } else {
+            items(notifications, key = { it.id }) { notice ->
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.Top) {
+                        Box(Modifier.size(40.dp).background(PaleBlue, CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Notifications, contentDescription = null, tint = NationBlue)
+                        }
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(notice.title, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            if (notice.body.isNotBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(notice.body, color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+                            }
+                            if (notice.createdAt.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(notice.createdAt, color = Muted, fontSize = 10.sp)
+                            }
+                        }
+                        if (!notice.isRead) {
+                            Box(Modifier.size(8.dp).background(NationBlue, CircleShape))
+                        }
+                    }
+                }
+            }
+        }
+        item { InfoNotice("This screen is read-only. Mark-as-read actions will be added only through a verified backend operation.") }
     }
 }
 

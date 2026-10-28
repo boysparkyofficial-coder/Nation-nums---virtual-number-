@@ -253,12 +253,25 @@ private fun NationNumsApp(activity: MainActivity) {
     } else {
         var selectedTab by remember { mutableStateOf(AppTab.Home) }
         var selectedPage by remember { mutableStateOf<ServicePage?>(null) }
+        var showSignIn by remember { mutableStateOf(false) }
+        val sessionStore = remember { Base44SessionStore(activity) }
+        val authApi = remember { Base44AuthApi(sessionStore) }
 
         BackHandler(enabled = selectedPage != null) {
             selectedPage = null
         }
 
-        Scaffold(
+        if (showSignIn) {
+            SignInScreen(
+                onBack = { showSignIn = false },
+                onLogin = { email, password, rememberMe, complete ->
+                    authApi.login(email, password, rememberMe) { result ->
+                        complete(if (result.success) null else result.error ?: "Sign-in failed.")
+                        if (result.success) showSignIn = false
+                    }
+                }
+            )
+        } else Scaffold(
             containerColor = Canvas,
             bottomBar = {
                 if (selectedPage == null) {
@@ -282,7 +295,7 @@ private fun NationNumsApp(activity: MainActivity) {
                 ServiceDetailPage(
                     page = selectedPage!!,
                     onBack = { selectedPage = null },
-                    onSignIn = { }
+                    onSignIn = { showSignIn = true }
                 )
             } else {
                 when (selectedTab) {
@@ -314,6 +327,85 @@ private fun NationNumsApp(activity: MainActivity) {
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun SignInScreen(
+    onBack: () -> Unit,
+    onLogin: (String, String, Boolean, (String?) -> Unit) -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier.fillMaxSize().background(Canvas).verticalScroll(rememberScrollState())
+            .padding(horizontal = 22.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
+            Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = NationBlue)
+            Spacer(Modifier.width(8.dp))
+            Text("Back to app", color = NationBlue, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(28.dp))
+        BrandMark()
+        Spacer(Modifier.height(18.dp))
+        Text("Sign in to Nation Nums", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Use the same email and password you use on the Nation Nums website.", color = Muted, fontSize = 14.sp, lineHeight = 20.sp)
+        Spacer(Modifier.height(24.dp))
+        OutlinedTextField(
+            value = email, onValueChange = { email = it; message = "" },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text("Email address") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+            shape = RoundedCornerShape(14.dp)
+        )
+        Spacer(Modifier.height(14.dp))
+        OutlinedTextField(
+            value = password, onValueChange = { password = it; message = "" },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            shape = RoundedCornerShape(14.dp)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { rememberMe = !rememberMe }) {
+            Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+            Column {
+                Text("Remember me", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(if (rememberMe) "Keep the encrypted session on this device." else "Session stays in memory and is not saved after closing the app.", color = Muted, fontSize = 11.sp)
+            }
+        }
+        if (message.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(message, color = Color(0xFFB42318), fontSize = 13.sp, lineHeight = 18.sp)
+        }
+        Spacer(Modifier.height(18.dp))
+        Button(
+            onClick = {
+                if (email.isBlank() || password.isBlank()) {
+                    message = "Enter your email and password."
+                } else {
+                    busy = true
+                    message = ""
+                    onLogin(email, password, rememberMe) { error ->
+                        busy = false
+                        message = error.orEmpty()
+                    }
+                }
+            },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text(if (busy) "Signing in…" else "Sign in securely", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(14.dp))
+        Text("Your password is sent only to the Nation Nums Base44 sign-in endpoint over HTTPS. The app does not create or modify wallet records directly.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
     }
 }
 

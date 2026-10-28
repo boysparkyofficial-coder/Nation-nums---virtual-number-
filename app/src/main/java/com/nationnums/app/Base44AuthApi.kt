@@ -227,6 +227,7 @@ internal class Base44AuthApi(
                     val userEmail = userJson.optString("email").trim()
                         .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }.orEmpty()
                     if (userId.isBlank() && userEmail.isBlank()) {
+                        sessionStore.clear()
                         Result(false, status, error = "Could not validate your account session. Please sign in again.")
                     } else {
                         Result(true, status, User(

@@ -258,6 +258,22 @@ private fun NationNumsApp(activity: MainActivity) {
         val authApi = remember { Base44AuthApi(sessionStore) }
         var signedInUser by remember { mutableStateOf<Base44AuthApi.User?>(null) }
         var checkingSession by remember { mutableStateOf(true) }
+        var walletTransactions by remember { mutableStateOf<List<WalletTransactionRecord>>(emptyList()) }
+        var walletLoading by remember { mutableStateOf(false) }
+        var walletError by remember { mutableStateOf("") }
+        val repository = remember { NationNumsRepository { sessionStore.readToken() } }
+
+        LaunchedEffect(signedInUser?.id, selectedTab) {
+            if (signedInUser != null && selectedTab == AppTab.Wallet) {
+                walletLoading = true
+                walletError = ""
+                repository.loadWalletTransactions { result, records ->
+                    walletLoading = false
+                    walletTransactions = records
+                    walletError = if (result.success) "" else result.error ?: "Could not load transactions."
+                }
+            }
+        }
 
         LaunchedEffect(Unit) {
             authApi.currentUser { result ->
@@ -330,7 +346,11 @@ private fun NationNumsApp(activity: MainActivity) {
                     )
                     AppTab.Wallet -> WalletScreen(
                         modifier = Modifier.padding(padding),
-                        onSignIn = { }
+                        transactions = walletTransactions,
+                        isLoading = walletLoading,
+                        errorMessage = walletError,
+                        isSignedIn = signedInUser != null,
+                        onSignIn = { showSignIn = true }
                     )
                     AppTab.Profile -> ProfileScreen(
                         modifier = Modifier.padding(padding),
@@ -912,38 +932,56 @@ private fun OrdersScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
 }
 
 @Composable
-private fun WalletScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(15.dp)
-    ) {
+private fun WalletScreen(
+    modifier: Modifier = Modifier,
+    transactions: List<WalletTransactionRecord>,
+    isLoading: Boolean,
+    errorMessage: String,
+    isSignedIn: Boolean,
+    onSignIn: () -> Unit
+) {
+    LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
         item { PageHeader("Wallet", "Manage your balance and funding activity.") }
         item {
             Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = NationBlue)) {
                 Column(Modifier.fillMaxWidth().padding(22.dp)) {
                     Text("AVAILABLE BALANCE", color = Color.White.copy(alpha = .8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text("₦ ———", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                    Text("Live balance requires account sign-in", color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
+                    Text("Not available", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isSignedIn) "Balance display needs a verified balance endpoint" else "Sign in to view account activity", color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
                 }
             }
         }
         item { Text("Funding methods", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold) }
         item { ServiceRow("Nation Flow", "Virtual bank account funding", Icons.Rounded.Wallet) { onSignIn() } }
         item { ServiceRow("NationCheckout", "Online payment gateway", Icons.Rounded.Add) { onSignIn() } }
-        item { ServiceRow("Transaction history", "Deposits, purchases and refunds", Icons.Rounded.History) { onSignIn() } }
-        item {
-            InfoNotice("Payments must be confirmed by the existing backend before a wallet is credited. This screen does not initiate real payments yet.")
-        }
-        item {
-            Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) {
-                Text("Account connection coming soon")
+        item { Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }
+        if (!isSignedIn) {
+            item { EmptyState(icon = Icons.Rounded.Wallet, title = "Sign in to view transactions", body = "Your transaction history is available after connecting your Nation Nums account.") }
+            item { Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) { Text("Sign in securely") } }
+        } else if (isLoading) {
+            item { Text("Loading your transaction history…", color = Muted, fontSize = 13.sp) }
+        } else if (errorMessage.isNotBlank()) {
+            item { InfoNotice(errorMessage) }
+        } else if (transactions.isEmpty()) {
+            item { EmptyState(icon = Icons.Rounded.History, title = "No transactions found", body = "Transactions will appear here after they are recorded by the Nation Nums backend.") }
+        } else {
+            items(transactions) { transaction ->
+                Card(shape = RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(42.dp).background(PaleBlue, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.History, contentDescription = null, tint = NationBlue) }
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(transaction.description.ifBlank { transaction.type.replaceFirstChar { it.uppercase() } }, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("\${transaction.status} · \${transaction.createdAt.ifBlank { "Date unavailable" }}", color = Muted, fontSize = 11.sp)
+                        }
+                        Text("₦\${transaction.amount}", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
             }
         }
+        item { InfoNotice("Payments are not initiated from this screen. Wallet credits must be confirmed by the existing backend; the app never writes wallet transactions directly.") }
     }
 }
-
 @Composable
 private fun ProfileScreen(
     modifier: Modifier = Modifier,

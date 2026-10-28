@@ -27,10 +27,16 @@ import java.util.concurrent.Executors
 internal class Base44SessionStore(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("nation_nums_session", Context.MODE_PRIVATE)
+    @Volatile private var transientToken: String? = null
 
     @Synchronized
-    fun saveToken(token: String) {
+    fun saveToken(token: String, rememberMe: Boolean = true) {
         require(token.isNotBlank()) { "Cannot store an empty session token." }
+        transientToken = token
+        if (!rememberMe) {
+            clearPersistedToken()
+            return
+        }
         val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
@@ -43,6 +49,7 @@ internal class Base44SessionStore(context: Context) {
 
     @Synchronized
     fun readToken(): String? {
+        transientToken?.let { return it }
         val ivEncoded = prefs.getString(KEY_IV, null) ?: return null
         val tokenEncoded = prefs.getString(KEY_TOKEN, null) ?: return null
         return try {
@@ -64,6 +71,12 @@ internal class Base44SessionStore(context: Context) {
 
     @Synchronized
     fun clear() {
+        transientToken = null
+        clearPersistedToken()
+    }
+
+    @Synchronized
+    private fun clearPersistedToken() {
         prefs.edit().remove(KEY_IV).remove(KEY_TOKEN).apply()
     }
 
@@ -113,7 +126,7 @@ internal class Base44AuthApi(
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun login(email: String, password: String, callback: (Result) -> Unit) {
+    fun login(email: String, password: String, rememberMe: Boolean = true, callback: (Result) -> Unit) {
         val cleanEmail = email.trim()
         if (cleanEmail.isBlank() || password.isBlank()) {
             callback(Result(false, 0, error = "Enter your email and password."))
@@ -144,7 +157,7 @@ internal class Base44AuthApi(
                     if (token.isBlank() || userJson == null) {
                         Result(false, status, error = "The sign-in response was incomplete. Please try again.")
                     } else {
-                        sessionStore.saveToken(token)
+                        sessionStore.saveToken(token, rememberMe)
                         Result(
                             true,
                             status,

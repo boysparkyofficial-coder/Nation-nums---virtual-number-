@@ -267,6 +267,9 @@ private fun NationNumsApp(activity: MainActivity) {
         var notifications by remember { mutableStateOf<List<NotificationRecord>>(emptyList()) }
         var notificationsLoading by remember { mutableStateOf(false) }
         var notificationsError by remember { mutableStateOf("") }
+        var smsMessages by remember { mutableStateOf<List<SmsMessageRecord>>(emptyList()) }
+        var ordersLoading by remember { mutableStateOf(false) }
+        var ordersError by remember { mutableStateOf("") }
         val repository = remember { NationNumsRepository { sessionStore.readToken() } }
 
         LaunchedEffect(signedInUser?.id, selectedTab, selectedPage) {
@@ -295,6 +298,35 @@ private fun NationNumsApp(activity: MainActivity) {
                     walletLoading = false
                     walletTransactions = records
                     walletError = if (result.success) "" else result.error ?: "Could not load transactions."
+                }
+            }
+            if (signedInUser != null && selectedTab == AppTab.Orders) {
+                ordersLoading = true
+                ordersError = ""
+                var numberResult: Base44Api.Result? = null
+                var smsResult: Base44Api.Result? = null
+                var loadedNumbers: List<VirtualNumberRecord> = emptyList()
+                var loadedMessages: List<SmsMessageRecord> = emptyList()
+                fun finishIfReady() {
+                    if (numberResult != null && smsResult != null) {
+                        ordersLoading = false
+                        virtualNumbers = loadedNumbers
+                        smsMessages = loadedMessages
+                        ordersError = listOfNotNull(
+                            numberResult?.takeIf { !it.success }?.error,
+                            smsResult?.takeIf { !it.success }?.error
+                        ).firstOrNull().orEmpty()
+                    }
+                }
+                repository.loadVirtualNumbers { result, records ->
+                    numberResult = result
+                    loadedNumbers = records
+                    finishIfReady()
+                }
+                repository.loadSmsMessages { result, records ->
+                    smsResult = result
+                    loadedMessages = records
+                    finishIfReady()
                 }
             }
         }
@@ -381,7 +413,12 @@ private fun NationNumsApp(activity: MainActivity) {
                     )
                     AppTab.Orders -> OrdersScreen(
                         modifier = Modifier.padding(padding),
-                        onSignIn = { }
+                        numbers = virtualNumbers,
+                        smsMessages = smsMessages,
+                        isLoading = ordersLoading,
+                        errorMessage = ordersError,
+                        isSignedIn = signedInUser != null,
+                        onSignIn = { showSignIn = true }
                     )
                     AppTab.Wallet -> WalletScreen(
                         modifier = Modifier.padding(padding),
@@ -995,39 +1032,127 @@ private fun ServicesScreen(
 }
 
 @Composable
-private fun OrdersScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
+private fun OrdersScreen(
+    modifier: Modifier = Modifier,
+    numbers: List<VirtualNumberRecord>,
+    smsMessages: List<SmsMessageRecord>,
+    isLoading: Boolean,
+    errorMessage: String,
+    isSignedIn: Boolean,
+    onSignIn: () -> Unit
+) {
     var filter by remember { mutableStateOf("All") }
-    Column(modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        PageHeader("Your orders", "Track purchases, number status and OTP activity.")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 10.dp)) {
-            listOf("All", "Active", "Completed").forEach { option ->
-                val selected = filter == option
-                Surface(
-                    color = if (selected) NationBlue else Color.White,
-                    shape = RoundedCornerShape(20.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) NationBlue else Border),
-                    modifier = Modifier.clickable { filter = option }
-                ) {
-                    Text(option, color = if (selected) Color.White else Muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp))
+    val visibleNumbers = numbers.filter { number ->
+        when (filter) {
+            "Active" -> number.status.equals("active", true) || number.status.equals("pending", true)
+            "Completed" -> number.status.equals("completed", true) || number.status.equals("expired", true) || number.status.equals("cancelled", true)
+            else -> true
+        }
+    }
+    LazyColumn(
+        modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item { PageHeader("Your orders", "Track numbers, activation status and received OTP messages.") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                listOf("All", "Active", "Completed").forEach { option ->
+                    val selected = filter == option
+                    Surface(
+                        color = if (selected) NationBlue else Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) NationBlue else Border),
+                        modifier = Modifier.clickable { filter = option }
+                    ) {
+                        Text(option, color = if (selected) Color.White else Muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp))
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        EmptyState(
-            icon = Icons.Rounded.History,
-            title = when (filter) {
-                "Active" -> "No active orders to show"
-                "Completed" -> "No completed orders to show"
-                else -> "Your orders will appear here"
-            },
-            body = when (filter) {
-                "Active" -> "Live activation, rental and OTP status will appear after Base44 account integration is completed."
-                "Completed" -> "Completed purchases and expired activations will appear after Base44 account integration is completed."
-                else -> "Real purchases, OTP messages, rental status and order history will appear after Base44 account integration is completed."
-            },
-            action = "Coming soon",
-            onAction = onSignIn
-        )
+        if (!isSignedIn) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.History,
+                    title = "Sign in to view your orders",
+                    body = "Your numbers and OTP messages are loaded from your Nation Nums account.",
+                    action = "Sign in",
+                    onAction = onSignIn
+                )
+            }
+        } else if (isLoading) {
+            item { Text("Loading your orders and OTP activity…", color = Muted, fontSize = 13.sp) }
+        } else if (errorMessage.isNotBlank()) {
+            item { InfoNotice(errorMessage) }
+        } else {
+            item { Text("NUMBERS", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
+            if (visibleNumbers.isEmpty()) {
+                item {
+                    Text(
+                        if (filter == "Active") "No active numbers found." else if (filter == "Completed") "No completed numbers found." else "No numbers recorded yet.",
+                        color = Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            } else {
+                items(visibleNumbers, key = { "order-" + it.id }) { number ->
+                    Card(
+                        shape = RoundedCornerShape(15.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(15.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, tint = NationBlue)
+                                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                                    Text(number.phoneNumber.ifBlank { "Number unavailable" }, color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Text(listOf(number.service, number.country).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Virtual number" }, color = Muted, fontSize = 12.sp)
+                                }
+                                Text(number.status.replaceFirstChar { it.uppercase() }, color = if (number.status.equals("active", true)) Green else Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (number.expiresAt.isNotBlank()) {
+                                Spacer(Modifier.height(7.dp))
+                                Text("Expires: " + number.expiresAt, color = Muted, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+            item { Text("RECEIVED OTP MESSAGES", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)) }
+            if (smsMessages.isEmpty()) {
+                item { Text("No OTP messages recorded yet.", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp)) }
+            } else {
+                items(smsMessages, key = { "sms-" + it.id }) { sms ->
+                    Card(
+                        shape = RoundedCornerShape(15.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(15.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("OTP", color = NationBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text(sms.code.ifBlank { "Code not detected" }, color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                            if (sms.sender.isNotBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text("From: " + sms.sender, color = Muted, fontSize = 11.sp)
+                            }
+                            if (sms.message.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(sms.message, color = Ink, fontSize = 12.sp, lineHeight = 18.sp, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                            }
+                            if (sms.createdAt.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(sms.createdAt, color = Muted, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        item { InfoNotice("This page is read-only. Number purchases, rentals, OTP requests and cancellations must be completed through verified Nation Nums backend operations.") }
     }
 }
 

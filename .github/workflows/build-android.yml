@@ -26,6 +26,23 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Download latest admin-managed Nation Nums logo
+        run: |
+          mkdir -p app/src/main/res/drawable-nodpi
+          curl --fail --location --retry 3 --retry-delay 2 \\
+            "https://base44.app/api/apps/6ac1b21923bd8a65822f7956/files/mp/public/6ac1b21923bd8a65822f7956/c45af28c6_1005314965.png" \\
+            --output /tmp/nation-nums-admin-logo.png
+          python3 -m pip install --quiet Pillow
+          python3 - <<'PY'
+          from PIL import Image
+          src = Image.open('/tmp/nation-nums-admin-logo.png').convert('RGBA')
+          src.thumbnail((448, 448), Image.Resampling.LANCZOS)
+          canvas = Image.new('RGBA', (512, 512), (255, 255, 255, 0))
+          canvas.alpha_composite(src, ((512 - src.width) // 2, (512 - src.height) // 2))
+          canvas.save('app/src/main/res/drawable-nodpi/ic_launcher_logo.png', optimize=True)
+          print(f'Prepared admin-managed logo: source={Image.open("/tmp/nation-nums-admin-logo.png").size}, icon={canvas.size}')
+          PY
+
       - name: Run local unit tests
         run: gradle testDebugUnitTest
 

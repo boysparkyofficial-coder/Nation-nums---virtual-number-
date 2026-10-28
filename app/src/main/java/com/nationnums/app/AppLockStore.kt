@@ -20,6 +20,30 @@ internal class AppLockStore(context: Context) {
 
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC, false)
 
+    fun isLockedOut(): Boolean = System.currentTimeMillis() < prefs.getLong(KEY_LOCKED_UNTIL, 0L)
+
+    fun remainingLockoutSeconds(): Long =
+        ((prefs.getLong(KEY_LOCKED_UNTIL, 0L) - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
+
+    /** Records a failed unlock and returns the number of attempts remaining before cooldown. */
+    fun recordFailedAttempt(): Int {
+        if (isLockedOut()) return 0
+        val failures = prefs.getInt(KEY_FAILED_ATTEMPTS, 0) + 1
+        if (failures >= MAX_FAILED_ATTEMPTS) {
+            prefs.edit()
+                .putInt(KEY_FAILED_ATTEMPTS, 0)
+                .putLong(KEY_LOCKED_UNTIL, System.currentTimeMillis() + LOCKOUT_MILLIS)
+                .apply()
+            return 0
+        }
+        prefs.edit().putInt(KEY_FAILED_ATTEMPTS, failures).apply()
+        return MAX_FAILED_ATTEMPTS - failures
+    }
+
+    fun clearFailedAttempts() {
+        prefs.edit().remove(KEY_FAILED_ATTEMPTS).remove(KEY_LOCKED_UNTIL).apply()
+    }
+
     fun configurePassword(password: String, biometricEnabled: Boolean) {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val hash = deriveHash(password, salt)
@@ -55,6 +79,10 @@ internal class AppLockStore(context: Context) {
         const val KEY_SALT = "password_salt"
         const val KEY_HASH = "password_hash"
         const val KEY_BIOMETRIC = "biometric_enabled"
+        const val KEY_FAILED_ATTEMPTS = "failed_attempts"
+        const val KEY_LOCKED_UNTIL = "locked_until"
+        const val MAX_FAILED_ATTEMPTS = 5
+        const val LOCKOUT_MILLIS = 30_000L
         const val PBKDF2_ITERATIONS = 120_000
         const val HASH_BITS = 256
     }

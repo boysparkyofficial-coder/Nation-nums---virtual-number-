@@ -233,11 +233,19 @@ private fun NationNumsApp(activity: MainActivity) {
                 }
             },
             onUnlockPassword = { password ->
-                if (lockStore.verifyPassword(password)) {
+                if (lockStore.isLockedOut()) {
+                    gateError = "Too many incorrect attempts. Try again in ${lockStore.remainingLockoutSeconds()} seconds."
+                } else if (lockStore.verifyPassword(password)) {
+                    lockStore.clearFailedAttempts()
                     gateError = ""
                     gateState = GateState.Dashboard
                 } else {
-                    gateError = "That app password is incorrect. Try again or use biometrics."
+                    val attemptsRemaining = lockStore.recordFailedAttempt()
+                    gateError = if (attemptsRemaining <= 0) {
+                        "Too many incorrect attempts. App unlock is paused for 30 seconds."
+                    } else {
+                        "Incorrect passcode. ${attemptsRemaining} attempt(s) left before a short lockout."
+                    }
                 }
             },
             onBiometric = { promptBiometric() }

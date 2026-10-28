@@ -167,9 +167,12 @@ internal class Base44AuthApi(
                 }.orEmpty()
                 if (status in 200..299) {
                     val json = JSONObject(raw)
-                    val token = json.optString("access_token").takeUnless { it.isBlank() || it == "null" }.orEmpty()
+                    val token = json.optString("access_token").trim()
+                        .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }.orEmpty()
                     val userJson = json.optJSONObject("user")
-                    if (token.isBlank() || userJson == null || userJson.optString("id").isBlank() || userJson.optString("id") == "null") {
+                    val userId = userJson?.optString("id").orEmpty().trim()
+                        .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }.orEmpty()
+                    if (token.isBlank() || userJson == null || userId.isBlank()) {
                         Result(false, status, error = "The sign-in response was incomplete. Please try again.")
                     } else {
                         sessionStore.saveToken(token, rememberMe)
@@ -177,10 +180,18 @@ internal class Base44AuthApi(
                             true,
                             status,
                             User(
-                                id = userJson.optString("id"),
-                                email = userJson.optString("email", cleanEmail),
-                                username = userJson.optString("username", userJson.optString("full_name", "")),
-                                role = userJson.optString("role", "user")
+                                id = userId,
+                                email = userJson.optString("email").trim()
+                                    .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                                    ?: cleanEmail,
+                                username = userJson.optString("username").trim()
+                                    .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                                    ?: userJson.optString("full_name").trim()
+                                        .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                                        .orEmpty(),
+                                role = userJson.optString("role").trim()
+                                    .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                                    ?: "user"
                             )
                         )
                     }

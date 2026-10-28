@@ -68,7 +68,11 @@ internal class Base44SessionStore(context: Context) {
             String(
                 cipher.doFinal(Base64.decode(tokenEncoded, Base64.NO_WRAP)),
                 StandardCharsets.UTF_8
-            ).takeIf { it.isNotBlank() }
+            ).trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                ?: run {
+                    clear()
+                    null
+                }
         } catch (_: Exception) {
             clear()
             null

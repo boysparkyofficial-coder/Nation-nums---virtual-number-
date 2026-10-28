@@ -56,8 +56,13 @@ internal class Base44SessionStore(context: Context) {
     @Synchronized
     fun readToken(): String? {
         transientToken?.let { return it }
-        val ivEncoded = prefs.getString(KEY_IV, null) ?: return null
-        val tokenEncoded = prefs.getString(KEY_TOKEN, null) ?: return null
+        val ivEncoded = prefs.getString(KEY_IV, null)
+        val tokenEncoded = prefs.getString(KEY_TOKEN, null)
+        if (ivEncoded == null || tokenEncoded == null) {
+            // Remove orphaned ciphertext/IV left by an interrupted or partial write.
+            clearPersistedToken()
+            return null
+        }
         return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(

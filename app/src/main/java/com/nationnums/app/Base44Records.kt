@@ -75,7 +75,7 @@ internal object Base44RecordParser {
         amount = json.optString("amount", "0"),
         status = json.optString("status", "unknown"),
         description = json.optString("description"),
-        createdAt = json.optString("created_date", json.optString("created_at"))
+        createdAt = firstNonBlank(json, "created_date", "created_at")
     )
 
     fun virtualNumber(json: JSONObject) = VirtualNumberRecord(
@@ -89,20 +89,25 @@ internal object Base44RecordParser {
 
     fun notification(json: JSONObject) = NotificationRecord(
         id = json.optString("id"),
-        title = json.optString("title", "Nation Nums update"),
+        title = json.optString("title").ifBlank { "Nation Nums update" },
         body = json.optString("body"),
-        type = json.optString("type", "system"),
+        type = json.optString("type").ifBlank { "system" },
         isRead = json.optBoolean("read", false),
-        createdAt = json.optString("created_date", json.optString("created_at"))
+        createdAt = firstNonBlank(json, "created_date", "created_at")
     )
 
     fun smsMessage(json: JSONObject) = SmsMessageRecord(
         id = json.optString("id"),
-        code = json.optString("code"),
-        message = json.optString("message"),
+        code = firstNonBlank(json, "otp_code", "code"),
+        message = firstNonBlank(json, "body", "message"),
         sender = json.optString("sender"),
-        createdAt = json.optString("created_date", json.optString("created_at"))
+        createdAt = firstNonBlank(json, "received_at", "created_date", "created_at")
     )
+
+    private fun firstNonBlank(json: JSONObject, vararg keys: String): String =
+        keys.firstNotNullOfOrNull { key ->
+            json.optString(key).takeIf { it.isNotBlank() && it != "null" }
+        }.orEmpty()
 
     private fun jsonObjects(array: JSONArray): List<JSONObject> =
         (0 until array.length()).mapNotNull { index ->

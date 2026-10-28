@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.HelpOutline
@@ -69,7 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -494,7 +494,7 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
         item {
             Spacer(Modifier.height(18.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
-                Icon(Icons.Rounded.ArrowForward, contentDescription = "Back", tint = NationBlue)
+                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = NationBlue)
                 Spacer(Modifier.width(8.dp))
                 Text("Back", color = NationBlue, fontWeight = FontWeight.SemiBold)
             }

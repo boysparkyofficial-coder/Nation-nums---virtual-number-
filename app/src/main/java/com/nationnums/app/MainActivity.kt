@@ -1225,8 +1225,8 @@ private fun WalletScreen(
             }
         }
         item { Text("Funding methods", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold) }
-        item { ServiceRow("Nation Flow", "Virtual bank account funding", Icons.Rounded.Wallet) { onSignIn() } }
-        item { ServiceRow("NationCheckout", "Online payment gateway", Icons.Rounded.Add) { onSignIn() } }
+        item { ServiceRow("Nation Flow", "Virtual account funding · connection pending", Icons.Rounded.Wallet) { } }
+        item { ServiceRow("NationCheckout", "Online payment · connection pending", Icons.Rounded.Add) { } }
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))

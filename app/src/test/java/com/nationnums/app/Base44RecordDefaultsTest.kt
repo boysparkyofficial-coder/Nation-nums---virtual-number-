@@ -11,6 +11,8 @@ class Base44RecordDefaultsTest {
         assertEquals("unknown", transaction.type)
         assertEquals("unknown", transaction.status)
         assertEquals("unknown", number.status)
+        val blankAmount = Base44RecordParser.walletTransaction(JSONObject("""{"id":"t2","amount":""}"""))
+        assertEquals("0", blankAmount.amount)
     }
 
     @Test fun missingNotificationFieldsUseSafeDefaults() {

@@ -5,6 +5,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class Base44RecordDefaultsTest {
+    @Test fun blankTransactionAndNumberStatusesUseUnknownFallback() {
+        val transaction = Base44RecordParser.walletTransaction(JSONObject("""{"id":"t1","type":"","status":""}"""))
+        val number = Base44RecordParser.virtualNumber(JSONObject("""{"id":"v1","status":""}"""))
+        assertEquals("unknown", transaction.type)
+        assertEquals("unknown", transaction.status)
+        assertEquals("unknown", number.status)
+    }
+
     @Test fun missingNotificationFieldsUseSafeDefaults() {
         val record = Base44RecordParser.notification(JSONObject("""{"id":"n1"}"""))
         assertEquals("Nation Nums update", record.title)

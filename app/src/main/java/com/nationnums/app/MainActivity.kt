@@ -269,12 +269,13 @@ private fun NationNumsApp(activity: MainActivity) {
         var notifications by remember { mutableStateOf<List<NotificationRecord>>(emptyList()) }
         var notificationsLoading by remember { mutableStateOf(false) }
         var notificationsError by remember { mutableStateOf("") }
+        var notificationsRefresh by remember { mutableStateOf(0) }
         var smsMessages by remember { mutableStateOf<List<SmsMessageRecord>>(emptyList()) }
         var ordersLoading by remember { mutableStateOf(false) }
         var ordersError by remember { mutableStateOf("") }
         val repository = remember { NationNumsRepository { sessionStore.readToken() } }
 
-        LaunchedEffect(signedInUser?.id, selectedTab, selectedPage) {
+        LaunchedEffect(signedInUser?.id, selectedTab, selectedPage, notificationsRefresh) {
             if (signedInUser != null && selectedPage == ServicePage.Notifications) {
                 notificationsLoading = true
                 notificationsError = ""
@@ -386,7 +387,8 @@ private fun NationNumsApp(activity: MainActivity) {
                     errorMessage = notificationsError,
                     isSignedIn = signedInUser != null,
                     onBack = { selectedPage = null },
-                    onSignIn = { showSignIn = true }
+                    onSignIn = { showSignIn = true },
+                    onRefresh = { notificationsRefresh++ }
                 )
             } else if (selectedPage != null) {
                 ServiceDetailPage(
@@ -1302,7 +1304,8 @@ private fun NotificationsScreen(
     errorMessage: String,
     isSignedIn: Boolean,
     onBack: () -> Unit,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onRefresh: () -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -1310,10 +1313,15 @@ private fun NotificationsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
-                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = NationBlue)
-                Spacer(Modifier.width(8.dp))
-                Text("Back", color = NationBlue, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).clickable(onClick = onBack)) {
+                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = NationBlue)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Back", color = NationBlue, fontWeight = FontWeight.SemiBold)
+                }
+                OutlinedButton(onClick = onRefresh, enabled = isSignedIn && !isLoading, shape = RoundedCornerShape(10.dp)) {
+                    Text(if (isLoading) "Loading…" else "Refresh")
+                }
             }
             PageHeader("Notifications", "Updates recorded for your Nation Nums account.")
         }

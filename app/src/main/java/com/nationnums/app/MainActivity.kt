@@ -98,6 +98,15 @@ import androidx.compose.ui.unit.sp
 private val NationBlue = Color(0xFF145DDB)
 private val Ink = Color(0xFF14213D)
 private val Muted = Color(0xFF6C7890)
+
+private fun formatNairaAmount(rawAmount: String): String {
+    val normalized = rawAmount.trim().replace(",", "").replace("₦", "").trim()
+    val amount = normalized.toBigDecimalOrNull() ?: return "₦$rawAmount"
+    val formatter = java.text.NumberFormat.getNumberInstance(java.util.Locale("en", "NG"))
+    formatter.maximumFractionDigits = 2
+    formatter.minimumFractionDigits = 0
+    return "₦${formatter.format(amount)}"
+}
 private val Canvas = Color(0xFFF5F7FC)
 private val PaleBlue = Color(0xFFEAF1FF)
 private val Border = Color(0xFFE4EAF4)
@@ -1251,7 +1260,7 @@ private fun WalletScreen(
                             Text(transaction.description.ifBlank { transaction.type.replaceFirstChar { it.uppercase() } }, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             Text("${transaction.status} · ${transaction.createdAt.ifBlank { "Date unavailable" }}", color = Muted, fontSize = 11.sp)
                         }
-                        Text("₦${transaction.amount}", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(formatNairaAmount(transaction.amount), color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }

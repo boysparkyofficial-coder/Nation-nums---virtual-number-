@@ -998,7 +998,7 @@ private fun ServicesScreen(
                         if (number.phoneNumber.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(number.phoneNumber)) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
-                                Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(5.dp))
                                 Text("Copy number", fontSize = 11.sp)
                             }
@@ -1145,7 +1145,7 @@ private fun OrdersScreen(
                             if (number.phoneNumber.isNotBlank()) {
                                 Spacer(Modifier.height(8.dp))
                                 OutlinedButton(onClick = { clipboardManager.setText(AnnotatedString(number.phoneNumber)) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
-                                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, modifier = Modifier.size(14.dp))
                                     Spacer(Modifier.width(5.dp))
                                     Text("Copy number", fontSize = 11.sp)
                                 }

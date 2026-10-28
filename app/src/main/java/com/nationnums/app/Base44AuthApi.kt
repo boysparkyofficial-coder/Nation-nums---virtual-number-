@@ -31,10 +31,13 @@ internal class Base44SessionStore(context: Context) {
 
     @Synchronized
     fun saveToken(token: String, rememberMe: Boolean = true) {
-        require(token.isNotBlank()) { "Cannot store an empty session token." }
+        val cleanToken = token.trim()
+        require(cleanToken.isNotBlank() && !cleanToken.equals("null", ignoreCase = true)) {
+            "Cannot store an empty or invalid session token."
+        }
         if (!rememberMe) {
             clearPersistedToken()
-            transientToken = token
+            transientToken = cleanToken
             return
         }
         // Persist successfully before publishing the in-memory session. If encryption
@@ -42,12 +45,12 @@ internal class Base44SessionStore(context: Context) {
         val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
-        val encrypted = cipher.doFinal(token.toByteArray(StandardCharsets.UTF_8))
+        val encrypted = cipher.doFinal(cleanToken.toByteArray(StandardCharsets.UTF_8))
         prefs.edit()
             .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
             .putString(KEY_TOKEN, Base64.encodeToString(encrypted, Base64.NO_WRAP))
             .apply()
-        transientToken = token
+        transientToken = cleanToken
     }
 
     @Synchronized

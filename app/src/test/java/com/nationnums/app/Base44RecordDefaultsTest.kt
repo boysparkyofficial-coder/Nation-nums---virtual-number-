@@ -28,4 +28,11 @@ class Base44RecordDefaultsTest {
         assertEquals("0", nullAmount.amount)
         assertEquals("0", whitespaceAmount.amount)
     }
+
+    @Test fun nullNotificationTextUsesSafeDefaults() {
+        val record = Base44RecordParser.notification(JSONObject("""{"id":"n2","title":null,"body":null,"type":null}"""))
+        assertEquals("Nation Nums update", record.title)
+        assertEquals("", record.body)
+        assertEquals("system", record.type)
+    }
 }

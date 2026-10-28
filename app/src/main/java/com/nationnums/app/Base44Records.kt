@@ -72,7 +72,7 @@ internal object Base44RecordParser {
     fun walletTransaction(json: JSONObject) = WalletTransactionRecord(
         id = json.optString("id"),
         type = firstNonBlank(json, "type").ifBlank { "unknown" },
-        amount = json.optString("amount", "0"),
+        amount = firstNonBlank(json, "amount").ifBlank { "0" },
         status = firstNonBlank(json, "status").ifBlank { "unknown" },
         description = json.optString("description"),
         createdAt = firstNonBlank(json, "created_date", "created_at")

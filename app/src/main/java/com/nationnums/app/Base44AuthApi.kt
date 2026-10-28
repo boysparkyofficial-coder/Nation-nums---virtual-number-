@@ -2,6 +2,8 @@ package com.nationnums.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -109,6 +111,7 @@ internal class Base44AuthApi(
     )
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun login(email: String, password: String, callback: (Result) -> Unit) {
         val cleanEmail = email.trim()
@@ -167,7 +170,7 @@ internal class Base44AuthApi(
             } finally {
                 connection?.disconnect()
             }
-            callback(result)
+            mainHandler.post { callback(result) }
         }
     }
 

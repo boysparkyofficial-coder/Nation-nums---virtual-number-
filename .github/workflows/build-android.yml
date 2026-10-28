@@ -26,11 +26,12 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Download latest admin-managed Nation Nums logo
+      - name: Try to download latest admin-managed Nation Nums logo
+        continue-on-error: true
         run: |
           mkdir -p app/src/main/res/drawable-nodpi
-          curl --fail --location --retry 3 --retry-delay 2 \\
-            "https://media.base44.com/images/public/6ac1b21923bd8a65822f7956/c45af28c6_1005314965.png" \\
+          curl --fail --location --retry 2 --retry-delay 2 \
+            "https://base44.app/api/apps/6ac1b21923bd8a65822f7956/files/mp/public/6ac1b21923bd8a65822f7956/c45af28c6_1005314965.png" \
             --output /tmp/nation-nums-admin-logo.png
           python3 -m pip install --quiet Pillow
           python3 - <<'PY'
@@ -40,7 +41,7 @@ jobs:
           canvas = Image.new('RGBA', (512, 512), (255, 255, 255, 0))
           canvas.alpha_composite(src, ((512 - src.width) // 2, (512 - src.height) // 2))
           canvas.save('app/src/main/res/drawable-nodpi/ic_launcher_logo.png', optimize=True)
-          print(f'Prepared admin-managed logo: source={Image.open("/tmp/nation-nums-admin-logo.png").size}, icon={canvas.size}')
+          print(f'Prepared admin-managed logo: icon={canvas.size}')
           PY
 
       - name: Run local unit tests

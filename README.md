@@ -11,8 +11,7 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 ## Current stage
 - Native Android project scaffold and dashboard UI.
 - GitHub Actions builds a debug APK.
-- The app now contains a dependency-free Base44 entity API client scaffold for the existing Nation Nums app ID. It is not yet wired to sign-in screens or account data.
-- Live authentication, Continue with Google, wallet, payment, catalog, order, OTP and push-notification flows remain unconnected until their actual website/Base44 contracts and logo asset are verified. Do not treat displayed placeholder values as live account data.
+- Wallet, authentication, payment, catalog, order and OTP data are not yet connected to the live Nation Nums backend. Do not treat displayed placeholder values as live account data.
 
 ## Backend integration requirements
 The app must use the existing Nation Nums Base44 backend as the source of truth. No second database, Supabase, Cloudflare backend, or payment-provider secret keys should be added to the APK. Before wiring account actions, verify the actual Base44 auth and function contracts from the existing website/backend.

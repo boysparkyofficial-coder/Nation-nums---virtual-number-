@@ -1,7 +1,10 @@
 package com.nationnums.app
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -62,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +81,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.KeyboardType
@@ -94,7 +99,17 @@ private val PaleBlue = Color(0xFFEAF1FF)
 private val Border = Color(0xFFE4EAF4)
 private val Green = Color(0xFF17845D)
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    var shouldLockOnResume by mutableStateOf(false)
+        private set
+
+    fun clearRelockFlag() { shouldLockOnResume = false }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations && !isFinishing) shouldLockOnResume = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -107,7 +122,7 @@ class MainActivity : ComponentActivity() {
                     onSurface = Ink
                 )
             ) {
-                NationNumsApp()
+                NationNumsApp(this@MainActivity)
             }
         }
     }
@@ -137,78 +152,308 @@ private enum class ServicePage(val title: String, val subtitle: String) {
     Legal("Policies & app information", "Privacy, terms and app details")
 }
 
-@Composable
-private fun NationNumsApp() {
-    var selectedTab by remember { mutableStateOf(AppTab.Home) }
-    var selectedPage by remember { mutableStateOf<ServicePage?>(null) }
-    var showSignIn by remember { mutableStateOf(false) }
+private enum class GateState { Setup, Locked, Dashboard }
 
-    // Let Android's system Back button close nested screens before leaving the app.
-    BackHandler(enabled = showSignIn || selectedPage != null) {
-        if (showSignIn) {
-            showSignIn = false
-        } else {
-            selectedPage = null
+@Composable
+private fun NationNumsApp(activity: MainActivity) {
+    val lockStore = remember { AppLockStore(activity) }
+    var gateState by remember {
+        mutableStateOf(if (lockStore.isConfigured()) GateState.Locked else GateState.Setup)
+    }
+    var gateError by remember { mutableStateOf("") }
+    val biometricAvailable = remember {
+        BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    LaunchedEffect(activity.shouldLockOnResume) {
+        if (activity.shouldLockOnResume) {
+            if (gateState == GateState.Dashboard) {
+                gateState = GateState.Locked
+                gateError = ""
+            }
+            activity.clearRelockFlag()
         }
     }
 
-    Scaffold(
-        containerColor = Canvas,
-        bottomBar = {
-            if (selectedPage == null && !showSignIn) {
-                NavigationBar(
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
-                    containerColor = Color.White
-                ) {
-                    AppTab.entries.forEach { tab ->
-                        NavigationBarItem(
-                            selected = selectedTab == tab,
-                            onClick = { selectedTab = tab },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label, fontSize = 10.sp) }
+    fun promptBiometric() {
+        if (!biometricAvailable || !lockStore.isBiometricEnabled()) {
+            gateError = "Biometric unlock is not available. Use your app password."
+            return
+        }
+        val prompt = BiometricPrompt(
+            activity,
+            ContextCompat.getMainExecutor(activity),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    gateError = ""
+                    gateState = GateState.Dashboard
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    gateError = "Biometric not recognised. Try again or use your app password."
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                        errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                        errorCode != BiometricPrompt.ERROR_CANCELED
+                    ) {
+                        gateError = errString.toString()
+                    }
+                }
+            }
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock Nation Nums")
+            .setSubtitle("Confirm it's you to open the app")
+            .setNegativeButtonText("Use app password")
+            .build()
+        prompt.authenticate(promptInfo)
+    }
+
+    if (gateState != GateState.Dashboard) {
+        AppLockScreen(
+            isSetup = gateState == GateState.Setup,
+            biometricAvailable = biometricAvailable,
+            biometricEnabled = lockStore.isBiometricEnabled(),
+            errorMessage = gateError,
+            onCreatePassword = { password, enableBiometric ->
+                if (password.length < 4) {
+                    gateError = "Choose an app password with at least 4 characters."
+                } else {
+                    lockStore.configurePassword(password, enableBiometric && biometricAvailable)
+                    gateError = ""
+                    gateState = GateState.Dashboard
+                }
+            },
+            onUnlockPassword = { password ->
+                if (lockStore.verifyPassword(password)) {
+                    gateError = ""
+                    gateState = GateState.Dashboard
+                } else {
+                    gateError = "That app password is incorrect. Try again or use biometrics."
+                }
+            },
+            onBiometric = { promptBiometric() }
+        )
+    } else {
+        var selectedTab by remember { mutableStateOf(AppTab.Home) }
+        var selectedPage by remember { mutableStateOf<ServicePage?>(null) }
+
+        BackHandler(enabled = selectedPage != null) {
+            selectedPage = null
+        }
+
+        Scaffold(
+            containerColor = Canvas,
+            bottomBar = {
+                if (selectedPage == null) {
+                    NavigationBar(
+                        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+                        containerColor = Color.White
+                    ) {
+                        AppTab.entries.forEach { tab ->
+                            NavigationBarItem(
+                                selected = selectedTab == tab,
+                                onClick = { selectedTab = tab },
+                                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                                label = { Text(tab.label, fontSize = 10.sp) }
+                            )
+                        }
+                    }
+                }
+            }
+        ) { padding ->
+            if (selectedPage != null) {
+                ServiceDetailPage(
+                    page = selectedPage!!,
+                    onBack = { selectedPage = null },
+                    onSignIn = { }
+                )
+            } else {
+                when (selectedTab) {
+                    AppTab.Home -> Dashboard(
+                        modifier = Modifier.padding(padding),
+                        onFund = { selectedTab = AppTab.Wallet },
+                        onBuy = { selectedTab = AppTab.Numbers },
+                        onOrders = { selectedTab = AppTab.Orders },
+                        onNotifications = { selectedPage = ServicePage.Notifications },
+                        onProfile = { selectedTab = AppTab.Profile }
+                    )
+                    AppTab.Numbers -> ServicesScreen(
+                        modifier = Modifier.padding(padding),
+                        onOpen = { selectedPage = it }
+                    )
+                    AppTab.Orders -> OrdersScreen(
+                        modifier = Modifier.padding(padding),
+                        onSignIn = { }
+                    )
+                    AppTab.Wallet -> WalletScreen(
+                        modifier = Modifier.padding(padding),
+                        onSignIn = { }
+                    )
+                    AppTab.Profile -> ProfileScreen(
+                        modifier = Modifier.padding(padding),
+                        onOpen = { selectedPage = it },
+                        onSignIn = { }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppLockScreen(
+    isSetup: Boolean,
+    biometricAvailable: Boolean,
+    biometricEnabled: Boolean,
+    errorMessage: String,
+    onCreatePassword: (String, Boolean) -> Unit,
+    onUnlockPassword: (String) -> Unit,
+    onBiometric: () -> Unit
+) {
+    var password by remember(isSetup) { mutableStateOf("") }
+    var confirmPassword by remember(isSetup) { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var enableBiometric by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Canvas)
+            .imePadding()
+            .verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            BrandMark()
+            Spacer(Modifier.height(18.dp))
+            Text(
+                if (isSetup) "Secure your app" else "Welcome back",
+                color = Ink,
+                fontSize = 27.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(7.dp))
+            Text(
+                if (isSetup)
+                    "Create a private app password before opening your dashboard."
+                else
+                    "Unlock Nation Nums to continue to your dashboard.",
+                color = Muted,
+                fontSize = 13.sp,
+                lineHeight = 19.sp
+            )
+            Spacer(Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(if (isSetup) "Create app password" else "App password") },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = if (isSetup) ImeAction.Next else ImeAction.Done
+                ),
+                shape = RoundedCornerShape(13.dp)
+            )
+            if (isSetup) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Confirm app password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    shape = RoundedCornerShape(13.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Checkbox(
+                        checked = enableBiometric,
+                        onCheckedChange = { enableBiometric = it },
+                        enabled = biometricAvailable
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text("Also enable biometric unlock", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (biometricAvailable) "Use your enrolled fingerprint or supported biometric."
+                            else "Set up a supported biometric on this phone to enable this option.",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
                         )
                     }
                 }
             }
-        }
-    ) { padding ->
-        when {
-            showSignIn -> SignInPreview(
-                modifier = Modifier.padding(padding),
-                onBack = { showSignIn = false }
-            )
-            selectedPage != null -> ServiceDetailPage(
-                page = selectedPage!!,
-                onBack = { selectedPage = null },
-                onSignIn = { showSignIn = true }
-            )
-            else -> when (selectedTab) {
-                AppTab.Home -> Dashboard(
-                    modifier = Modifier.padding(padding),
-                    onFund = { selectedTab = AppTab.Wallet },
-                    onBuy = { selectedTab = AppTab.Numbers },
-                    onOrders = { selectedTab = AppTab.Orders },
-                    onNotifications = { selectedPage = ServicePage.Notifications },
-                    onProfile = { selectedTab = AppTab.Profile }
-                )
-                AppTab.Numbers -> ServicesScreen(
-                    modifier = Modifier.padding(padding),
-                    onOpen = { selectedPage = it }
-                )
-                AppTab.Orders -> OrdersScreen(
-                    modifier = Modifier.padding(padding),
-                    onSignIn = { showSignIn = true }
-                )
-                AppTab.Wallet -> WalletScreen(
-                    modifier = Modifier.padding(padding),
-                    onSignIn = { showSignIn = true }
-                )
-                AppTab.Profile -> ProfileScreen(
-                    modifier = Modifier.padding(padding),
-                    onOpen = { selectedPage = it },
-                    onSignIn = { showSignIn = true }
-                )
+
+            if (errorMessage.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(errorMessage, color = Color(0xFFB42318), fontSize = 12.sp, lineHeight = 17.sp)
             }
+
+            Spacer(Modifier.height(17.dp))
+            Button(
+                onClick = {
+                    if (isSetup) {
+                        if (password != confirmPassword) {
+                            onCreatePassword("", false)
+                        } else {
+                            onCreatePassword(password, enableBiometric)
+                        }
+                    } else {
+                        onUnlockPassword(password)
+                    }
+                },
+                enabled = password.isNotBlank() && (!isSetup || confirmPassword.isNotBlank()),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Text(if (isSetup) "Create app password" else "Unlock dashboard", fontWeight = FontWeight.Bold)
+            }
+
+            if (!isSetup && biometricEnabled) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onBiometric,
+                    enabled = biometricAvailable,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(13.dp)
+                ) {
+                    Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Continue with biometrics")
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "This app password is only for this mobile app. It is not your Nation Nums website password and does not replace Base44 account authentication.",
+                color = Muted,
+                fontSize = 11.sp,
+                lineHeight = 16.sp
+            )
         }
     }
 }
@@ -445,11 +690,11 @@ private fun OrdersScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
                 else -> "Your orders will appear here"
             },
             body = when (filter) {
-                "Active" -> "Sign in to check active number activations, rentals and incoming OTP status."
-                "Completed" -> "Sign in to review completed purchases, expired activations and previous orders."
-                else -> "Sign in to view real purchases, OTP messages, rental status and order history."
+                "Active" -> "Live activation, rental and OTP status will appear after Base44 account integration is completed."
+                "Completed" -> "Completed purchases and expired activations will appear after Base44 account integration is completed."
+                else -> "Real purchases, OTP messages, rental status and order history will appear after Base44 account integration is completed."
             },
-            action = "Sign in",
+            action = "Coming soon",
             onAction = onSignIn
         )
     }
@@ -482,7 +727,7 @@ private fun WalletScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
         }
         item {
             Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) {
-                Text("Sign in to continue")
+                Text("Account connection coming soon")
             }
         }
     }
@@ -507,12 +752,12 @@ private fun ProfileScreen(
                     }
                     Column(Modifier.weight(1f).padding(start = 12.dp)) {
                         Text("Welcome to Nation Nums", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Sign in to access your account", color = Muted, fontSize = 12.sp)
+                        Text("Account connection is being integrated", color = Muted, fontSize = 12.sp)
                     }
                     Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Muted)
                 }
                 Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp), shape = RoundedCornerShape(12.dp)) {
-                    Text("Sign in / Create account")
+                    Text("Account connection coming soon")
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -567,7 +812,7 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                     Text("Next step", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(7.dp))
                     Text(
-                        "Sign in and connect to your existing Nation Nums account to access this feature.",
+                        "The app-only password or biometric unlock protects this device. Live account access will be connected to the existing Base44 authentication flow.",
                         color = Muted, fontSize = 13.sp, lineHeight = 19.sp
                     )
                     Spacer(Modifier.height(16.dp))
@@ -576,83 +821,6 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SignInPreview(modifier: Modifier = Modifier, onBack: () -> Unit) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(false) }
-    val passwordFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        BrandMark()
-        Spacer(Modifier.height(22.dp))
-        Text("Welcome back", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink)
-        Spacer(Modifier.height(6.dp))
-        Text("Sign in to your Nation Nums account.", color = Muted, fontSize = 14.sp)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Email address") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
-            shape = RoundedCornerShape(13.dp)
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
-            singleLine = true,
-            label = { Text("Password") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                    )
-                }
-            },
-            shape = RoundedCornerShape(13.dp)
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
-            Text("Remember me", color = Ink, fontSize = 13.sp)
-        }
-        Spacer(Modifier.height(8.dp))
-        InfoNotice(
-            "Sign-in is still a preview. Remember me is not saved yet, and credentials are not sent anywhere until the existing Base44 authentication flow is verified and connected."
-        )
-        Spacer(Modifier.height(18.dp))
-        Button(
-            onClick = { },
-            enabled = email.isNotBlank() && password.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(13.dp)
-        ) {
-            Text("Authentication not connected yet")
-        }
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) {
-            Text("Back to app")
         }
     }
 }

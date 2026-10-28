@@ -39,10 +39,14 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Wallet
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +69,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -525,7 +533,13 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
 private fun SignInPreview(modifier: Modifier = Modifier, onBack: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    Column(modifier.fillMaxSize().padding(horizontal = 24.dp), verticalArrangement = Arrangement.Center) {
+    var passwordVisible by remember { mutableStateOf(false) }
+    var rememberMe by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier.fillMaxSize().padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
         BrandMark()
         Spacer(Modifier.height(22.dp))
         Text("Welcome back", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink)
@@ -538,6 +552,7 @@ private fun SignInPreview(modifier: Modifier = Modifier, onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text("Email address") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             shape = RoundedCornerShape(13.dp)
         )
         Spacer(Modifier.height(12.dp))
@@ -547,12 +562,33 @@ private fun SignInPreview(modifier: Modifier = Modifier, onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text("Password") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                    )
+                }
+            },
             shape = RoundedCornerShape(13.dp)
         )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+            Text("Remember me", color = Ink, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        InfoNotice(
+            "Sign-in is still a preview. Remember me is not saved yet, and credentials are not sent anywhere until the existing Base44 authentication flow is verified and connected."
+        )
         Spacer(Modifier.height(18.dp))
-        InfoNotice("Sign-in is a UI preview only. No credentials are sent or saved until the real Base44 authentication contract is connected.")
-        Spacer(Modifier.height(18.dp))
-        Button(onClick = { }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) {
+        Button(
+            onClick = { },
+            enabled = email.isNotBlank() && password.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(13.dp)
+        ) {
             Text("Authentication not connected yet")
         }
         Spacer(Modifier.height(10.dp))

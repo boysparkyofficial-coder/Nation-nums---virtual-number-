@@ -21,4 +21,11 @@ class Base44RecordDefaultsTest {
         assertEquals("system", record.type)
         assertEquals(false, record.isRead)
     }
+
+    @Test fun nullAndWhitespaceAmountsUseZeroFallback() {
+        val nullAmount = Base44RecordParser.walletTransaction(JSONObject("""{"id":"t3","amount":null}"""))
+        val whitespaceAmount = Base44RecordParser.walletTransaction(JSONObject("""{"id":"t4","amount":"   "}"""))
+        assertEquals("0", nullAmount.amount)
+        assertEquals("0", whitespaceAmount.amount)
+    }
 }

@@ -142,9 +142,9 @@ class MainActivity : FragmentActivity() {
 }
 
 private enum class AppTab(val label: String, val icon: ImageVector) {
-    Home("Home", Icons.Rounded.Home),
-    Numbers("Numbers", Icons.Rounded.PhoneAndroid),
-    Orders("Orders", Icons.Rounded.History),
+    Home("Dashboard", Icons.Rounded.Home),
+    Numbers("Phone", Icons.Rounded.PhoneAndroid),
+    Orders("Order", Icons.Rounded.History),
     Wallet("Wallet", Icons.Rounded.Wallet),
     Profile("Profile", Icons.Rounded.AccountCircle)
 }
@@ -412,11 +412,14 @@ private fun NationNumsApp(activity: MainActivity) {
                 when (selectedTab) {
                     AppTab.Home -> Dashboard(
                         modifier = Modifier.padding(padding),
+                        signedIn = signedInUser != null,
+                        displayName = signedInUser?.username?.ifBlank { signedInUser?.email?.substringBefore("@") }.orEmpty(),
                         onFund = { selectedTab = AppTab.Wallet },
                         onBuy = { selectedTab = AppTab.Numbers },
                         onOrders = { selectedTab = AppTab.Orders },
                         onNotifications = { selectedPage = ServicePage.Notifications },
-                        onProfile = { selectedTab = AppTab.Profile }
+                        onProfile = { selectedTab = AppTab.Profile },
+                        onService = { selectedPage = it }
                     )
                     AppTab.Numbers -> ServicesScreen(
                         modifier = Modifier.padding(padding),
@@ -788,98 +791,140 @@ private fun AppLockScreen(
 @Composable
 private fun Dashboard(
     modifier: Modifier = Modifier,
+    signedIn: Boolean,
+    displayName: String,
     onFund: () -> Unit,
     onBuy: () -> Unit,
     onOrders: () -> Unit,
     onNotifications: () -> Unit,
-    onProfile: () -> Unit
+    onProfile: () -> Unit,
+    onService: (ServicePage) -> Unit
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp),
+        modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
+        contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 BrandMark()
-                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text("Nation Nums", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Column(Modifier.weight(1f).padding(start = 11.dp)) {
+                    Text("Nation Nums", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
                     Text("Your numbers. One dashboard.", fontSize = 12.sp, color = Muted)
                 }
-                Icon(
-                    Icons.Rounded.Notifications,
-                    contentDescription = "Notifications",
-                    tint = NationBlue,
-                    modifier = Modifier.size(28.dp).clickable(onClick = onNotifications)
-                )
-                Spacer(Modifier.width(12.dp))
-                Icon(
-                    Icons.Rounded.AccountCircle,
-                    contentDescription = "Profile",
-                    tint = NationBlue,
-                    modifier = Modifier.size(29.dp).clickable(onClick = onProfile)
-                )
+                IconButton(onClick = onNotifications) {
+                    Icon(Icons.Rounded.Notifications, contentDescription = "Notifications", tint = NationBlue)
+                }
+                IconButton(onClick = onProfile) {
+                    Icon(Icons.Rounded.AccountCircle, contentDescription = "Profile", tint = NationBlue)
+                }
             }
         }
         item {
             Card(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(26.dp),
                 colors = CardDefaults.cardColors(containerColor = NationBlue),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(Modifier.padding(22.dp)) {
-                    Text("WALLET BALANCE", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("₦ ———", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                    Text("Sign in to load your live balance", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        onClick = onFund,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = NationBlue),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null)
-                        Text("  Fund wallet", fontWeight = FontWeight.Bold)
+                Box {
+                    Column(Modifier.fillMaxWidth().padding(22.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(if (signedIn) "WELCOME BACK" else "YOUR NATION NUMS ACCOUNT", color = Color.White.copy(alpha = .78f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    if (signedIn && displayName.isNotBlank()) "Hello, $displayName" else if (signedIn) "Your workspace is ready" else "Everything in one place",
+                                    color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 29.sp
+                                )
+                            }
+                            Box(Modifier.size(52.dp).background(Color.White.copy(alpha = .15f), CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                            }
+                        }
+                        Spacer(Modifier.height(19.dp))
+                        Text("WALLET BALANCE", color = Color.White.copy(alpha = .76f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+                        Spacer(Modifier.height(5.dp))
+                        Text("₦ — — —", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            if (signedIn) "Balance is waiting for the verified wallet endpoint" else "Sign in to connect your live wallet",
+                            color = Color.White.copy(alpha = .82f), fontSize = 11.sp
+                        )
+                        Spacer(Modifier.height(17.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = onFund,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = NationBlue),
+                                shape = RoundedCornerShape(13.dp),
+                                modifier = Modifier.weight(1f).height(47.dp)
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Fund wallet", fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = onOrders,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .65f)),
+                                shape = RoundedCornerShape(13.dp),
+                                modifier = Modifier.weight(1f).height(47.dp)
+                            ) { Text("View orders", fontWeight = FontWeight.SemiBold) }
+                        }
                     }
                 }
             }
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Quick actions", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("View all", color = NationBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable(onClick = onBuy))
+                Column(Modifier.weight(1f)) {
+                    Text("Quick actions", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Jump straight to what you need", color = Muted, fontSize = 12.sp)
+                }
+                Text("See all", color = NationBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onBuy() })
+            }
+            Spacer(Modifier.height(11.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickAction("Buy number", "Virtual numbers", Icons.Rounded.PhoneAndroid, onBuy, Modifier.weight(1f))
+                QuickAction("Buy US number", "US options", Icons.Rounded.Search, { onService(ServicePage.UsNumbers) }, Modifier.weight(1f))
             }
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickAction("Buy number", "Virtual & US", Icons.Rounded.PhoneAndroid, onBuy, Modifier.weight(1f))
-                QuickAction("My orders", "View purchases", Icons.Rounded.History, onOrders, Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickAction("Rent number", "Longer access", Icons.Rounded.History, { onService(ServicePage.Rentals) }, Modifier.weight(1f))
+                QuickAction("Email OTP", "Email services", Icons.Rounded.CheckCircle, { onService(ServicePage.EmailOtp) }, Modifier.weight(1f))
             }
         }
         item {
-            Text("Explore services", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Services", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Browse available Nation Nums tools", color = Muted, fontSize = 12.sp)
+                }
+            }
             Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ServiceRow("Rent a number", "Temporary and rental options", Icons.Rounded.PhoneAndroid) { onBuy() }
-                ServiceRow("Email OTP", "Supported email verification services", Icons.Rounded.CheckCircle) { onBuy() }
-                ServiceRow("Proxy services", "Browse available proxy options", Icons.Rounded.Shield) { onBuy() }
+                ServiceRow("Buy virtual number", "Choose country, service and available option", Icons.Rounded.PhoneAndroid) { onService(ServicePage.VirtualNumbers) }
+                ServiceRow("Buy US number", "Compare available US number options", Icons.Rounded.Search) { onService(ServicePage.UsNumbers) }
+                ServiceRow("Rent a number", "Browse supported rental durations", Icons.Rounded.History) { onService(ServicePage.Rentals) }
+                ServiceRow("Email OTP", "Browse email verification services", Icons.Rounded.CheckCircle) { onService(ServicePage.EmailOtp) }
+                ServiceRow("Proxy services", "View available proxy options", Icons.Rounded.Shield) { onService(ServicePage.Proxies) }
             }
         }
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
+                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onProfile)
             ) {
-                Row(Modifier.padding(17.dp), verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Rounded.Shield, contentDescription = null, tint = NationBlue, modifier = Modifier.size(24.dp))
-                    Column(Modifier.padding(start = 12.dp)) {
-                        Text("Your account, securely connected", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
-                        Spacer(Modifier.height(5.dp))
-                        Text(
-                            "This preview does not show live wallet or order data. Sign-in and account actions will be enabled only after the existing backend connection is verified.",
-                            color = Muted, fontSize = 12.sp, lineHeight = 18.sp
-                        )
+                Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(42.dp).background(PaleBlue, CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.AccountCircle, contentDescription = null, tint = NationBlue, modifier = Modifier.size(24.dp))
                     }
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text("Account & settings", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
+                        Spacer(Modifier.height(3.dp))
+                        Text("Profile, security, notifications and support", color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                    }
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = "Open profile", tint = Muted)
                 }
             }
         }

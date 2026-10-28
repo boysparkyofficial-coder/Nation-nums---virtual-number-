@@ -89,9 +89,9 @@ internal object Base44RecordParser {
 
     fun notification(json: JSONObject) = NotificationRecord(
         id = json.optString("id"),
-        title = json.optString("title").ifBlank { "Nation Nums update" },
-        body = json.optString("body"),
-        type = json.optString("type").ifBlank { "system" },
+        title = firstNonBlank(json, "title").ifBlank { "Nation Nums update" },
+        body = firstNonBlank(json, "body"),
+        type = firstNonBlank(json, "type").ifBlank { "system" },
         isRead = json.optBoolean("read", false),
         createdAt = firstNonBlank(json, "created_date", "created_at")
     )

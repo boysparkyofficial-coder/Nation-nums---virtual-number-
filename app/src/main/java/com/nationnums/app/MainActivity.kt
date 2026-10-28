@@ -261,9 +261,21 @@ private fun NationNumsApp(activity: MainActivity) {
         var walletTransactions by remember { mutableStateOf<List<WalletTransactionRecord>>(emptyList()) }
         var walletLoading by remember { mutableStateOf(false) }
         var walletError by remember { mutableStateOf("") }
+        var virtualNumbers by remember { mutableStateOf<List<VirtualNumberRecord>>(emptyList()) }
+        var numbersLoading by remember { mutableStateOf(false) }
+        var numbersError by remember { mutableStateOf("") }
         val repository = remember { NationNumsRepository { sessionStore.readToken() } }
 
         LaunchedEffect(signedInUser?.id, selectedTab) {
+            if (signedInUser != null && selectedTab == AppTab.Numbers) {
+                numbersLoading = true
+                numbersError = ""
+                repository.loadVirtualNumbers { result, records ->
+                    numbersLoading = false
+                    virtualNumbers = records
+                    numbersError = if (result.success) "" else result.error ?: "Could not load your numbers."
+                }
+            }
             if (signedInUser != null && selectedTab == AppTab.Wallet) {
                 walletLoading = true
                 walletError = ""
@@ -338,6 +350,11 @@ private fun NationNumsApp(activity: MainActivity) {
                     )
                     AppTab.Numbers -> ServicesScreen(
                         modifier = Modifier.padding(padding),
+                        numbers = virtualNumbers,
+                        numbersLoading = numbersLoading,
+                        numbersError = numbersError,
+                        isSignedIn = signedInUser != null,
+                        onSignIn = { showSignIn = true },
                         onOpen = { selectedPage = it }
                     )
                     AppTab.Orders -> OrdersScreen(
@@ -835,7 +852,15 @@ private fun PageHeader(title: String, subtitle: String, modifier: Modifier = Mod
 }
 
 @Composable
-private fun ServicesScreen(modifier: Modifier = Modifier, onOpen: (ServicePage) -> Unit) {
+private fun ServicesScreen(
+    modifier: Modifier = Modifier,
+    numbers: List<VirtualNumberRecord>,
+    numbersLoading: Boolean,
+    numbersError: String,
+    isSignedIn: Boolean,
+    onSignIn: () -> Unit,
+    onOpen: (ServicePage) -> Unit
+) {
     var query by remember { mutableStateOf("") }
     val services = listOf(
         Triple(ServicePage.VirtualNumbers, "Buy virtual numbers", "Choose a country and service"),
@@ -851,6 +876,59 @@ private fun ServicesScreen(modifier: Modifier = Modifier, onOpen: (ServicePage) 
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
+        item { PageHeader("Your numbers", "View virtual numbers linked to your account.") }
+        if (!isSignedIn) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.PhoneAndroid,
+                    title = "Sign in to view your numbers",
+                    body = "Your existing numbers will appear here after you sign in.",
+                    action = "Sign in",
+                    onAction = onSignIn
+                )
+            }
+        } else if (numbersLoading) {
+            item { Text("Loading your numbers…", color = Muted, fontSize = 13.sp) }
+        } else if (numbersError.isNotBlank()) {
+            item { InfoNotice(numbersError) }
+        } else if (numbers.isEmpty()) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.PhoneAndroid,
+                    title = "No numbers found",
+                    body = "Numbers recorded by the backend will appear here.",
+                    action = "Browse services",
+                    onAction = { onOpen(ServicePage.VirtualNumbers) }
+                )
+            }
+        } else {
+            items(numbers, key = { it.id }) { number ->
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(15.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, tint = NationBlue, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f).padding(start = 2.dp)) {
+                                Text(number.phoneNumber.ifBlank { "Number unavailable" }, color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(listOf(number.service, number.country).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Virtual number" }, color = Muted, fontSize = 12.sp)
+                            }
+                            Text(number.status.replaceFirstChar { it.uppercase() }, color = if (number.status.equals("active", true)) Green else Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        if (number.expiresAt.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Expires: " + number.expiresAt, color = Muted, fontSize = 11.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+        item { Text("Buy a service", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(top = 10.dp)) }
         item { PageHeader("Numbers & services", "Choose the service you want to use.") }
         item {
             OutlinedTextField(

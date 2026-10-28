@@ -360,6 +360,9 @@ private fun ServicesScreen(modifier: Modifier = Modifier, onOpen: (ServicePage) 
         Triple(ServicePage.EmailOtp, "Email OTP", "Email verification services"),
         Triple(ServicePage.Proxies, "Proxy services", "Available proxy products")
     )
+    val filteredServices = services.filter {
+        it.second.contains(query, ignoreCase = true) || it.third.contains(query, ignoreCase = true)
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
@@ -377,9 +380,28 @@ private fun ServicesScreen(modifier: Modifier = Modifier, onOpen: (ServicePage) 
             )
             Spacer(Modifier.height(18.dp))
         }
-        items(services.filter { it.second.contains(query, ignoreCase = true) || it.third.contains(query, ignoreCase = true) }) { item ->
+        items(filteredServices) { item ->
             ServiceRow(item.second, item.third, Icons.Rounded.PhoneAndroid) { onOpen(item.first) }
             Spacer(Modifier.height(10.dp))
+        }
+        if (filteredServices.isEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(17.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = NationBlue, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.height(10.dp))
+                        Text("No matching services", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(Modifier.height(5.dp))
+                        Text("Try another service name, such as virtual, US, rent, email or proxy.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
         }
         item {
             Spacer(Modifier.height(8.dp))

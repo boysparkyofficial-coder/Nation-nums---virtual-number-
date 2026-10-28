@@ -256,6 +256,15 @@ private fun NationNumsApp(activity: MainActivity) {
         var showSignIn by remember { mutableStateOf(false) }
         val sessionStore = remember { Base44SessionStore(activity) }
         val authApi = remember { Base44AuthApi(sessionStore) }
+        var signedInUser by remember { mutableStateOf<Base44AuthApi.User?>(null) }
+        var checkingSession by remember { mutableStateOf(true) }
+
+        LaunchedEffect(Unit) {
+            authApi.currentUser { result ->
+                signedInUser = if (result.success) result.user else null
+                checkingSession = false
+            }
+        }
 
         BackHandler(enabled = selectedPage != null) {
             selectedPage = null
@@ -267,7 +276,11 @@ private fun NationNumsApp(activity: MainActivity) {
                 onLogin = { email, password, rememberMe, complete ->
                     authApi.login(email, password, rememberMe) { result ->
                         complete(if (result.success) null else result.error ?: "Sign-in failed.")
-                        if (result.success) showSignIn = false
+                        if (result.success) {
+                            signedInUser = result.user
+                            checkingSession = false
+                            showSignIn = false
+                        }
                     }
                 }
             )
@@ -321,8 +334,15 @@ private fun NationNumsApp(activity: MainActivity) {
                     )
                     AppTab.Profile -> ProfileScreen(
                         modifier = Modifier.padding(padding),
+                        user = signedInUser,
+                        checkingSession = checkingSession,
                         onOpen = { selectedPage = it },
-                        onSignIn = { }
+                        onSignIn = { showSignIn = true },
+                        onSignOut = {
+                            authApi.logout()
+                            signedInUser = null
+                            showSignIn = false
+                        }
                     )
                 }
             }
@@ -927,8 +947,11 @@ private fun WalletScreen(modifier: Modifier = Modifier, onSignIn: () -> Unit) {
 @Composable
 private fun ProfileScreen(
     modifier: Modifier = Modifier,
+    user: Base44AuthApi.User?,
+    checkingSession: Boolean,
     onOpen: (ServicePage) -> Unit,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -942,13 +965,41 @@ private fun ProfileScreen(
                         Icon(Icons.Rounded.AccountCircle, contentDescription = null, tint = NationBlue, modifier = Modifier.size(32.dp))
                     }
                     Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text("Welcome to Nation Nums", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Account connection is being integrated", color = Muted, fontSize = 12.sp)
+                        Text(
+                            when {
+                                checkingSession -> "Checking account…"
+                                user != null -> user.username.ifBlank { user.email.ifBlank { "Nation Nums user" } }
+                                else -> "Welcome to Nation Nums"
+                            },
+                            color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            when {
+                                checkingSession -> "Validating your secure session"
+                                user != null -> user.email
+                                else -> "Sign in to connect your account"
+                            },
+                            color = Muted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Muted)
+                    if (user != null) {
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = "Signed in", tint = Green)
+                    }
                 }
-                Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp), shape = RoundedCornerShape(12.dp)) {
-                    Text("Account connection coming soon")
+                if (user == null) {
+                    Button(
+                        onClick = onSignIn,
+                        enabled = !checkingSession,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text(if (checkingSession) "Checking session…" else "Sign in securely") }
+                } else {
+                    OutlinedButton(
+                        onClick = onSignOut,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("Sign out of this device") }
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -963,7 +1014,7 @@ private fun ProfileScreen(
             Text("TOOLS & SUPPORT", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
         }
-        item { ServiceRow("API key management", "API documentation is not included in the app", Icons.Rounded.Shield) { onOpen(ServicePage.ApiKeys) } }
+        item { ServiceRow("API key management", "Manage supported API access", Icons.Rounded.Shield) { onOpen(ServicePage.ApiKeys) } }
         item { ServiceRow("Team management", "Team members and access permissions", Icons.Rounded.AccountCircle) { onOpen(ServicePage.Team) } }
         item { ServiceRow("Help & support", "Support tickets and contact options", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Support) } }
         item { ServiceRow("FAQs", "Common questions", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Faq) } }

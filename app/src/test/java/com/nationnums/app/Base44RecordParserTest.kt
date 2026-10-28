@@ -43,13 +43,25 @@ class Base44RecordParserTest {
     }
 
     @Test
-    fun mapsSmsMessageFields() {
+    fun mapsSmsFieldsUsingActualBase44SchemaNames() {
         val sms = Base44RecordParser.smsMessage(
-            JSONObject("""{"id":"sms-1","code":"483921","message":"Your code is 483921","sender":"WhatsApp"}""")
+            JSONObject("""{"id":"sms-1","otp_code":"483921","body":"Your code is 483921","sender":"WhatsApp","received_at":"2026-10-28T10:00:00Z"}""")
         )
+        assertEquals("sms-1", sms.id)
         assertEquals("483921", sms.code)
         assertEquals("WhatsApp", sms.sender)
         assertTrue(sms.message.contains(sms.code))
+        assertEquals("2026-10-28T10:00:00Z", sms.createdAt)
+    }
+
+    @Test
+    fun supportsLegacySmsFieldAliases() {
+        val sms = Base44RecordParser.smsMessage(
+            JSONObject("""{"code":"111222","message":"Code 111222","created_at":"yesterday"}""")
+        )
+        assertEquals("111222", sms.code)
+        assertEquals("Code 111222", sms.message)
+        assertEquals("yesterday", sms.createdAt)
     }
 
     @Test

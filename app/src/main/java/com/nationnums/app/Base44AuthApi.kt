@@ -215,14 +215,22 @@ internal class Base44AuthApi(
                 if (status in 200..299) {
                     val root = JSONObject(raw)
                     val userJson = root.optJSONObject("user") ?: root.optJSONObject("data") ?: root
-                    if (userJson.optString("id").isBlank() && userJson.optString("email").isBlank()) {
+                    val userId = userJson.optString("id").trim()
+                        .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }.orEmpty()
+                    val userEmail = userJson.optString("email").trim()
+                        .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }.orEmpty()
+                    if (userId.isBlank() && userEmail.isBlank()) {
                         Result(false, status, error = "Could not validate your account session. Please sign in again.")
                     } else {
                         Result(true, status, User(
-                            id = userJson.optString("id"),
-                            email = userJson.optString("email"),
-                            username = userJson.optString("username", userJson.optString("full_name", "")),
-                            role = userJson.optString("role", "user")
+                            id = userId,
+                            email = userEmail,
+                            username = userJson.optString("username").trim()
+                                .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                                ?: userJson.optString("full_name").trim()
+                                    .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }.orEmpty(),
+                            role = userJson.optString("role").trim()
+                                .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) } ?: "user"
                         ))
                     }
                 } else {

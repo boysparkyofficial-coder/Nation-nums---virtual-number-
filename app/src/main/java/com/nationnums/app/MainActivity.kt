@@ -413,7 +413,7 @@ private fun NationNumsApp(activity: MainActivity) {
                     AppTab.Home -> Dashboard(
                         modifier = Modifier.padding(padding),
                         signedIn = signedInUser != null,
-                        displayName = signedInUser?.username?.ifBlank { signedInUser?.email?.substringBefore("@") }.orEmpty(),
+                        displayName = signedInUser?.username?.takeIf { it.isNotBlank() } ?: signedInUser?.email?.substringBefore("@").orEmpty(),
                         onFund = { selectedTab = AppTab.Wallet },
                         onBuy = { selectedTab = AppTab.Numbers },
                         onOrders = { selectedTab = AppTab.Orders },

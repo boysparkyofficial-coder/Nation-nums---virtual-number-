@@ -84,6 +84,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.KeyboardType
@@ -1041,6 +1043,7 @@ private fun OrdersScreen(
     isSignedIn: Boolean,
     onSignIn: () -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
     var filter by remember { mutableStateOf("All") }
     val visibleNumbers = numbers.filter { number ->
         when (filter) {
@@ -1133,7 +1136,13 @@ private fun OrdersScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("OTP", color = NationBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 Spacer(Modifier.width(10.dp))
-                                Text(sms.code.ifBlank { "Code not detected" }, color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text(sms.code.ifBlank { "Code not detected" }, color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                                if (sms.code.isNotBlank()) {
+                                    OutlinedButton(
+                                        onClick = { clipboardManager.setText(AnnotatedString(sms.code)) },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    ) { Text("Copy code", fontSize = 11.sp) }
+                                }
                             }
                             if (sms.sender.isNotBlank()) {
                                 Spacer(Modifier.height(4.dp))

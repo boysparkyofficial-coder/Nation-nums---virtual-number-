@@ -1258,7 +1258,7 @@ private fun WalletScreen(
                         Box(Modifier.size(42.dp).background(PaleBlue, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.History, contentDescription = null, tint = NationBlue) }
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(transaction.description.ifBlank { transaction.type.replaceFirstChar { it.uppercase() } }, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text("${transaction.status} · ${transaction.createdAt.ifBlank { "Date unavailable" }}", color = Muted, fontSize = 11.sp)
+                            Text("${transaction.status.replaceFirstChar { it.uppercase() }} · ${transaction.createdAt.ifBlank { "Date unavailable" }}", color = Muted, fontSize = 11.sp)
                         }
                         Text(formatNairaAmount(transaction.amount), color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }

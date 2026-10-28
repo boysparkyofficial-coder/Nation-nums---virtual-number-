@@ -957,14 +957,14 @@ private fun WalletScreen(
         item { ServiceRow("NationCheckout", "Online payment gateway", Icons.Rounded.Add) { onSignIn() } }
         item { Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }
         if (!isSignedIn) {
-            item { EmptyState(icon = Icons.Rounded.Wallet, title = "Sign in to view transactions", body = "Your transaction history is available after connecting your Nation Nums account.") }
+            item { EmptyState(icon = Icons.Rounded.Wallet, title = "Sign in to view transactions", body = "Your transaction history is available after connecting your Nation Nums account.", action = "Sign in", onAction = onSignIn) }
             item { Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) { Text("Sign in securely") } }
         } else if (isLoading) {
             item { Text("Loading your transaction history…", color = Muted, fontSize = 13.sp) }
         } else if (errorMessage.isNotBlank()) {
             item { InfoNotice(errorMessage) }
         } else if (transactions.isEmpty()) {
-            item { EmptyState(icon = Icons.Rounded.History, title = "No transactions found", body = "Transactions will appear here after they are recorded by the Nation Nums backend.") }
+            item { EmptyState(icon = Icons.Rounded.History, title = "No transactions found", body = "Transactions will appear here after they are recorded by the Nation Nums backend.", action = "Refresh later", onAction = {}) }
         } else {
             items(transactions) { transaction ->
                 Card(shape = RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
@@ -972,9 +972,9 @@ private fun WalletScreen(
                         Box(Modifier.size(42.dp).background(PaleBlue, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.History, contentDescription = null, tint = NationBlue) }
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(transaction.description.ifBlank { transaction.type.replaceFirstChar { it.uppercase() } }, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text("\${transaction.status} · \${transaction.createdAt.ifBlank { "Date unavailable" }}", color = Muted, fontSize = 11.sp)
+                            Text("${transaction.status} · ${transaction.createdAt.ifBlank { "Date unavailable" }}", color = Muted, fontSize = 11.sp)
                         }
-                        Text("₦\${transaction.amount}", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("₦${transaction.amount}", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }

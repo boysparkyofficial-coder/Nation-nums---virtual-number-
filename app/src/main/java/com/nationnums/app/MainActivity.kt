@@ -1,6 +1,8 @@
 package com.nationnums.app
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -159,6 +161,7 @@ private enum class ServicePage(val title: String, val subtitle: String) {
     Support("Help & support", "Get help with your account"),
     Security("Security", "Protect your Nation Nums account"),
     ApiKeys("API key management", "Manage keys for supported API access"),
+    Documentation("API Documentation", "Open the official Nation Nums API documentation in your browser"),
     Team("Team management", "Manage team access and permissions"),
     Telegram("Telegram settings", "Account linking and supported alerts"),
     Faq("Frequently asked questions", "Answers about Nation Nums"),
@@ -419,7 +422,11 @@ private fun NationNumsApp(activity: MainActivity) {
                         onOrders = { selectedTab = AppTab.Orders },
                         onNotifications = { selectedPage = ServicePage.Notifications },
                         onProfile = { selectedTab = AppTab.Profile },
-                        onService = { selectedPage = it }
+                        onService = { page ->
+                            if (page == ServicePage.Documentation) {
+                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://nation-nums.base44.app/docs"))) }
+                            } else selectedPage = page
+                        }
                     )
                     AppTab.Numbers -> ServicesScreen(
                         modifier = Modifier.padding(padding),
@@ -454,7 +461,11 @@ private fun NationNumsApp(activity: MainActivity) {
                         modifier = Modifier.padding(padding),
                         user = signedInUser,
                         checkingSession = checkingSession,
-                        onOpen = { selectedPage = it },
+                        onOpen = { page ->
+                            if (page == ServicePage.Documentation) {
+                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://nation-nums.base44.app/docs"))) }
+                            } else selectedPage = page
+                        },
                         onSignIn = { showSignIn = true },
                         onSignOut = {
                             authApi.logout()
@@ -1384,6 +1395,7 @@ private fun ProfileScreen(
             Spacer(Modifier.height(8.dp))
         }
         item { ServiceRow("API key management", "Manage supported API access", Icons.Rounded.Shield) { onOpen(ServicePage.ApiKeys) } }
+        item { ServiceRow("API Documentation", "Open the official documentation website", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Documentation) } }
         item { ServiceRow("Team management", "Team members and access permissions", Icons.Rounded.AccountCircle) { onOpen(ServicePage.Team) } }
         item { ServiceRow("Help & support", "Support tickets and contact options", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Support) } }
         item { ServiceRow("FAQs", "Common questions", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Faq) } }

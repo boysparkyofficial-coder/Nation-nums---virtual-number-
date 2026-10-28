@@ -263,9 +263,12 @@ private fun NationNumsApp(activity: MainActivity) {
         var walletTransactions by remember { mutableStateOf<List<WalletTransactionRecord>>(emptyList()) }
         var walletLoading by remember { mutableStateOf(false) }
         var walletError by remember { mutableStateOf("") }
+        var walletRefresh by remember { mutableStateOf(0) }
         var virtualNumbers by remember { mutableStateOf<List<VirtualNumberRecord>>(emptyList()) }
         var numbersLoading by remember { mutableStateOf(false) }
         var numbersError by remember { mutableStateOf("") }
+        var numbersRefresh by remember { mutableStateOf(0) }
+        var ordersRefresh by remember { mutableStateOf(0) }
         var notifications by remember { mutableStateOf<List<NotificationRecord>>(emptyList()) }
         var notificationsLoading by remember { mutableStateOf(false) }
         var notificationsError by remember { mutableStateOf("") }
@@ -275,7 +278,7 @@ private fun NationNumsApp(activity: MainActivity) {
         var ordersError by remember { mutableStateOf("") }
         val repository = remember { NationNumsRepository { sessionStore.readToken() } }
 
-        LaunchedEffect(signedInUser?.id, selectedTab, selectedPage, notificationsRefresh) {
+        LaunchedEffect(signedInUser?.id, selectedTab, selectedPage, notificationsRefresh, numbersRefresh, ordersRefresh, walletRefresh) {
             if (signedInUser != null && selectedPage == ServicePage.Notifications) {
                 notificationsLoading = true
                 notificationsError = ""
@@ -413,6 +416,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         numbersError = numbersError,
                         isSignedIn = signedInUser != null,
                         onSignIn = { showSignIn = true },
+                        onRefresh = { numbersRefresh++ },
                         onOpen = { selectedPage = it }
                     )
                     AppTab.Orders -> OrdersScreen(
@@ -422,7 +426,8 @@ private fun NationNumsApp(activity: MainActivity) {
                         isLoading = ordersLoading,
                         errorMessage = ordersError,
                         isSignedIn = signedInUser != null,
-                        onSignIn = { showSignIn = true }
+                        onSignIn = { showSignIn = true },
+                        onRefresh = { ordersRefresh++ }
                     )
                     AppTab.Wallet -> WalletScreen(
                         modifier = Modifier.padding(padding),
@@ -430,7 +435,8 @@ private fun NationNumsApp(activity: MainActivity) {
                         isLoading = walletLoading,
                         errorMessage = walletError,
                         isSignedIn = signedInUser != null,
-                        onSignIn = { showSignIn = true }
+                        onSignIn = { showSignIn = true },
+                        onRefresh = { walletRefresh++ }
                     )
                     AppTab.Profile -> ProfileScreen(
                         modifier = Modifier.padding(padding),
@@ -922,7 +928,8 @@ private fun ServicesScreen(
     numbersError: String,
     isSignedIn: Boolean,
     onSignIn: () -> Unit,
-    onOpen: (ServicePage) -> Unit
+    onOpen: (ServicePage) -> Unit,
+    onRefresh: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     val services = listOf(
@@ -939,7 +946,12 @@ private fun ServicesScreen(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
-        item { PageHeader("Your numbers", "View virtual numbers linked to your account.") }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) { PageHeader("Your numbers", "View virtual numbers linked to your account.") }
+                OutlinedButton(onClick = onRefresh, enabled = isSignedIn && !numbersLoading, shape = RoundedCornerShape(10.dp)) { Text(if (numbersLoading) "Loading…" else "Refresh") }
+            }
+        }
         if (!isSignedIn) {
             item {
                 EmptyState(
@@ -1043,7 +1055,8 @@ private fun OrdersScreen(
     isLoading: Boolean,
     errorMessage: String,
     isSignedIn: Boolean,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onRefresh: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     var filter by remember { mutableStateOf("All") }
@@ -1059,7 +1072,12 @@ private fun OrdersScreen(
         contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item { PageHeader("Your orders", "Track numbers, activation status and received OTP messages.") }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) { PageHeader("Your orders", "Track numbers, activation status and received OTP messages.") }
+                OutlinedButton(onClick = onRefresh, enabled = isSignedIn && !isLoading, shape = RoundedCornerShape(10.dp)) { Text(if (isLoading) "Loading…" else "Refresh") }
+            }
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
                 listOf("All", "Active", "Completed").forEach { option ->
@@ -1174,7 +1192,8 @@ private fun WalletScreen(
     isLoading: Boolean,
     errorMessage: String,
     isSignedIn: Boolean,
-    onSignIn: () -> Unit
+    onSignIn: () -> Unit,
+    onRefresh: () -> Unit
 ) {
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
         item { PageHeader("Wallet", "Manage your balance and funding activity.") }
@@ -1191,7 +1210,12 @@ private fun WalletScreen(
         item { Text("Funding methods", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold) }
         item { ServiceRow("Nation Flow", "Virtual bank account funding", Icons.Rounded.Wallet) { onSignIn() } }
         item { ServiceRow("NationCheckout", "Online payment gateway", Icons.Rounded.Add) { onSignIn() } }
-        item { Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = onRefresh, enabled = isSignedIn && !isLoading, shape = RoundedCornerShape(10.dp)) { Text(if (isLoading) "Loading…" else "Refresh") }
+            }
+        }
         if (!isSignedIn) {
             item { EmptyState(icon = Icons.Rounded.Wallet, title = "Sign in to view transactions", body = "Your transaction history is available after connecting your Nation Nums account.", action = "Sign in", onAction = onSignIn) }
             item { Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp)) { Text("Sign in securely") } }

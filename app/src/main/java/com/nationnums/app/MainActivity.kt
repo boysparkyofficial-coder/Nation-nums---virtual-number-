@@ -319,148 +319,232 @@ private fun AppLockScreen(
     onUnlockPassword: (String) -> Unit,
     onBiometric: () -> Unit
 ) {
-    var password by remember(isSetup) { mutableStateOf("") }
-    var confirmPassword by remember(isSetup) { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var enableBiometric by remember { mutableStateOf(false) }
+    var passcode by remember(isSetup) { mutableStateOf("") }
+    var confirmCode by remember(isSetup) { mutableStateOf("") }
+    var confirming by remember(isSetup) { mutableStateOf(false) }
+    var enableBiometric by remember(isSetup) { mutableStateOf(biometricEnabled) }
     var localError by remember(isSetup) { mutableStateOf("") }
-    val visibleError = if (localError.isNotBlank()) localError else errorMessage
+    var showRecoveryInfo by remember { mutableStateOf(false) }
+    val shownError = if (localError.isNotBlank()) localError else errorMessage
+    val activeCode = if (isSetup && confirming) confirmCode else passcode
+
+    fun addDigit(digit: String) {
+        localError = ""
+        if (isSetup && confirming) {
+            if (confirmCode.length < 5) confirmCode += digit
+        } else if (passcode.length < 5) {
+            passcode += digit
+        }
+    }
+    fun deleteDigit() {
+        localError = ""
+        if (isSetup && confirming) {
+            if (confirmCode.isNotEmpty()) confirmCode = confirmCode.dropLast(1)
+        } else if (passcode.isNotEmpty()) {
+            passcode = passcode.dropLast(1)
+        }
+    }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Canvas)
-            .imePadding()
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().background(Color.White).imePadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 30.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             BrandMark()
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
-                if (isSetup) "Secure your app" else "Welcome back",
-                color = Ink,
-                fontSize = 27.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(7.dp))
-            Text(
-                if (isSetup)
-                    "Create a private app password before opening your dashboard."
-                else
-                    "Unlock Nation Nums to continue to your dashboard.",
-                color = Muted,
-                fontSize = 13.sp,
-                lineHeight = 19.sp
-            )
-            Spacer(Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(if (isSetup) "Create app password" else "App password") },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                        )
-                    }
+                when {
+                    isSetup && !confirming -> "Secure your app"
+                    isSetup && confirming -> "Confirm passcode"
+                    else -> "Welcome back"
                 },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = if (isSetup) ImeAction.Next else ImeAction.Done
-                ),
-                shape = RoundedCornerShape(13.dp)
+                color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold
             )
-            if (isSetup) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Confirm app password") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    shape = RoundedCornerShape(13.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Checkbox(
-                        checked = enableBiometric,
-                        onCheckedChange = { enableBiometric = it },
-                        enabled = biometricAvailable
-                    )
-                    Column(Modifier.weight(1f)) {
-                        Text("Also enable biometric unlock", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Text(
-                            if (biometricAvailable) "Use your enrolled fingerprint or supported biometric."
-                            else "Set up a supported biometric on this phone to enable this option.",
-                            color = Muted,
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp
-                        )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when {
+                    isSetup && !confirming -> "Create a 5-digit app passcode"
+                    isSetup && confirming -> "Enter the same 5 digits again"
+                    else -> "Enter your Nation Nums app passcode"
+                },
+                color = Muted, fontSize = 14.sp
+            )
+            Spacer(Modifier.height(28.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                repeat(5) { index ->
+                    Box(
+                        modifier = Modifier.size(width = 49.dp, height = 57.dp)
+                            .background(Color(0xFFF5F5F7), RoundedCornerShape(12.dp))
+                            .then(
+                                if (index < activeCode.length)
+                                    Modifier.background(Color(0xFFF0EAFE), RoundedCornerShape(12.dp))
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (index < activeCode.length) {
+                            Text("●", color = Color(0xFF4A238B), fontSize = 18.sp)
+                        } else {
+                            Text(" ", color = Muted)
+                        }
                     }
                 }
             }
-
-            if (visibleError.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(visibleError, color = Color(0xFFB42318), fontSize = 12.sp, lineHeight = 17.sp)
-            }
-
-            Spacer(Modifier.height(17.dp))
-            Button(
-                onClick = {
-                    if (isSetup) {
-                        when {
-                            password.length < 4 -> localError = "Choose an app password with at least 4 characters."
-                            password != confirmPassword -> localError = "The two passwords do not match."
-                            else -> {
-                                localError = ""
-                                onCreatePassword(password, enableBiometric)
+            Spacer(Modifier.height(30.dp))
+            val keypadRows = listOf(
+                listOf("1", "2", "3"),
+                listOf("4", "5", "6"),
+                listOf("7", "8", "9"),
+                listOf("BIO", "0", "DEL")
+            )
+            keypadRows.forEach { rowDigits ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    rowDigits.forEach { key ->
+                        val isSpecial = key == "BIO" || key == "DEL"
+                        Box(
+                            modifier = Modifier.padding(vertical = 6.dp).size(68.dp)
+                                .background(
+                                    if (key == "BIO" && !isSetup && biometricEnabled && biometricAvailable)
+                                        Color(0xFF7A7A7A)
+                                    else Color(0xFFF4F4F5),
+                                    CircleShape
+                                )
+                                .clickable {
+                                    when (key) {
+                                        "DEL" -> deleteDigit()
+                                        "BIO" -> {
+                                            if (!isSetup && biometricEnabled && biometricAvailable) onBiometric()
+                                            else localError = "Fingerprint unlock is not enabled. Use your 5-digit passcode."
+                                        }
+                                        else -> addDigit(key)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when (key) {
+                                "BIO" -> Text(
+                                    "◉",
+                                    color = if (!isSetup && biometricEnabled && biometricAvailable) Color.White else Muted,
+                                    fontSize = 27.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                "DEL" -> Text("⌫", color = Muted, fontSize = 27.sp)
+                                else -> Text(key, color = Color(0xFF666666), fontSize = 22.sp, fontWeight = FontWeight.Medium)
                             }
                         }
-                    } else {
-                        localError = ""
-                        onUnlockPassword(password)
                     }
-                },
-                enabled = password.isNotBlank() && (!isSetup || confirmPassword.isNotBlank()),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(13.dp)
-            ) {
-                Text(if (isSetup) "Create app password" else "Unlock dashboard", fontWeight = FontWeight.Bold)
-            }
-
-            if (!isSetup && biometricEnabled) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onBiometric,
-                    enabled = biometricAvailable,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(13.dp)
-                ) {
-                    Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(19.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Continue with biometrics")
                 }
             }
-
+            if (isSetup && biometricAvailable) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = enableBiometric, onCheckedChange = { enableBiometric = it })
+                    Text("Enable fingerprint unlock", color = Ink, fontSize = 13.sp)
+                }
+            }
+            if (shownError.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(shownError, color = Color(0xFFB42318), fontSize = 12.sp, lineHeight = 17.sp)
+            }
+            if (showRecoveryInfo) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "For security, resetting this app-only passcode requires account re-authentication. The Base44 account recovery flow must be connected before passcode reset or account switching can be completed here.",
+                    color = Muted, fontSize = 11.sp, lineHeight = 16.sp
+                )
+            }
             Spacer(Modifier.height(18.dp))
+            Button(
+                onClick = {
+                    localError = ""
+                    if (isSetup && !confirming) {
+                        if (passcode.length != 5) localError = "Enter all 5 digits to continue."
+                        else confirming = true
+                    } else if (isSetup) {
+                        if (confirmCode.length != 5) localError = "Enter all 5 confirmation digits."
+                        else if (passcode != confirmCode) {
+                            confirmCode = ""
+                            localError = "Passcodes do not match. Please confirm again."
+                        } else {
+                            onCreatePassword(passcode, enableBiometric && biometricAvailable)
+                        }
+                    } else {
+                        if (passcode.length != 5) localError = "Enter all 5 digits to unlock."
+                        else onUnlockPassword(passcode)
+                    }
+                },
+                enabled = activeCode.length == 5,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(
+                    when {
+                        isSetup && !confirming -> "Continue"
+                        isSetup && confirming -> "Create passcode"
+                        else -> "Unlock Nation Nums"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (isSetup && confirming) {
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "Back",
+                    color = NationBlue,
+                    fontSize = 13.sp,
+                    modifier = Modifier.clickable {
+                        confirming = false
+                        confirmCode = ""
+                        localError = ""
+                    }.padding(8.dp)
+                )
+            }
+            if (!isSetup) {
+                Spacer(Modifier.height(15.dp))
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Forgot passcode?",
+                        color = Color(0xFF4A238B),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable {
+                            showRecoveryInfo = !showRecoveryInfo
+                            localError = ""
+                        }
+                    )
+                    Text("  |  ", color = Muted, fontSize = 13.sp)
+                    Text(
+                        "Switch account",
+                        color = Color(0xFF4A238B),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable {
+                            showRecoveryInfo = true
+                            localError = "Account switching is not available until secure Base44 sign-in is connected."
+                        }
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
             Text(
-                "This app password is only for this mobile app. It is not your Nation Nums website password and does not replace Base44 account authentication.",
-                color = Muted,
-                fontSize = 11.sp,
-                lineHeight = 16.sp
+                if (isSetup)
+                    "This passcode protects this mobile app only. It is separate from your website password."
+                else
+                    "Your app passcode is stored securely on this device and is separate from your website password.",
+                color = Muted, fontSize = 11.sp, lineHeight = 16.sp
             )
         }
     }

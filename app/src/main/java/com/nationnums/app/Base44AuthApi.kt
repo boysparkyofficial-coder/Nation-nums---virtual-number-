@@ -187,6 +187,59 @@ internal class Base44AuthApi(
         }
     }
 
+    /** Validates a stored session and retrieves the current Base44 user. */
+    fun currentUser(callback: (Result) -> Unit) {
+        val token = sessionStore.readToken()
+        if (token.isNullOrBlank()) {
+            mainHandler.post { callback(Result(false, 401, error = "Sign in to your Nation Nums account.")) }
+            return
+        }
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            val result = try {
+                connection = URL("$BASE_URL/entities/User/me").openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 12000
+                connection.readTimeout = 20000
+                connection.setRequestProperty("X-App-Id", APP_ID)
+                connection.setRequestProperty("Authorization", "Bearer $token")
+                connection.setRequestProperty("Accept", "application/json")
+                val status = connection.responseCode
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                val raw = stream?.let { input ->
+                    BufferedReader(InputStreamReader(input, StandardCharsets.UTF_8)).use { it.readText() }
+                }.orEmpty()
+                if (status in 200..299) {
+                    val root = JSONObject(raw)
+                    val userJson = root.optJSONObject("user") ?: root.optJSONObject("data") ?: root
+                    if (userJson.optString("id").isBlank() && userJson.optString("email").isBlank()) {
+                        Result(false, status, error = "Could not validate your account session. Please sign in again.")
+                    } else {
+                        Result(true, status, User(
+                            id = userJson.optString("id"),
+                            email = userJson.optString("email"),
+                            username = userJson.optString("username", userJson.optString("full_name", "")),
+                            role = userJson.optString("role", "user")
+                        ))
+                    }
+                } else {
+                    if (status == 401 || status == 403) sessionStore.clear()
+                    Result(false, status, error = when (status) {
+                        401, 403 -> "Your session has expired. Please sign in again."
+                        429 -> "Too many requests. Wait a little and try again."
+                        in 500..599 -> "Nation Nums is temporarily unavailable. Please try again."
+                        else -> "Could not validate your session (HTTP $status)."
+                    })
+                }
+            } catch (_: Exception) {
+                Result(false, 0, error = "Could not validate your session. Check your internet and try again.")
+            } finally {
+                connection?.disconnect()
+            }
+            mainHandler.post { callback(result) }
+        }
+    }
+
     fun logout() {
         sessionStore.clear()
     }

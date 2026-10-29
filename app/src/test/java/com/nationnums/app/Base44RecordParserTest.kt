@@ -66,6 +66,32 @@ class Base44RecordParserTest {
     }
 
     @Test
+    fun mapsLiveServiceCatalogueFields() {
+        val record = Base44RecordParser.serviceCatalog(
+            JSONObject("""{"id":"catalog-1","country":"United States","country_code":"US","flag":"🇺🇸","service":"WhatsApp","carrier":"Any","price_temporary":2000,"price_rental":9000,"listed_as":"temporary","available":true,"status":"active"}""")
+        )
+        assertEquals("catalog-1", record.id)
+        assertEquals("United States", record.country)
+        assertEquals("US", record.countryCode)
+        assertEquals("🇺🇸", record.flag)
+        assertEquals("WhatsApp", record.service)
+        assertEquals("2000", record.priceTemporary)
+        assertEquals("9000", record.priceRental)
+        assertEquals("temporary", record.listedAs)
+        assertTrue(record.available)
+        assertEquals("active", record.status)
+    }
+
+    @Test
+    fun defaultsMissingCatalogueFieldsSafely() {
+        val record = Base44RecordParser.serviceCatalog(JSONObject("""{"id":"catalog-2","service":"Telegram"}"""))
+        assertEquals("temporary", record.listedAs)
+        assertTrue(record.available)
+        assertEquals("active", record.status)
+        assertTrue(record.priceTemporary.isBlank())
+    }
+
+    @Test
     fun handlesEmptyAndMalformedResponsesSafely() {
         assertTrue(Base44RecordParser.records("").isEmpty())
         assertTrue(Base44RecordParser.records("not-json").isEmpty())

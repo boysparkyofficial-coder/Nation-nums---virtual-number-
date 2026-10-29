@@ -284,6 +284,9 @@ private fun NationNumsApp(activity: MainActivity) {
         var walletError by remember { mutableStateOf("") }
         var walletRefresh by remember { mutableStateOf(0) }
         var virtualNumbers by remember { mutableStateOf<List<VirtualNumberRecord>>(emptyList()) }
+        var serviceCatalog by remember { mutableStateOf<List<ServiceCatalogRecord>>(emptyList()) }
+        var catalogLoading by remember { mutableStateOf(false) }
+        var catalogError by remember { mutableStateOf("") }
         var numbersLoading by remember { mutableStateOf(false) }
         var numbersError by remember { mutableStateOf("") }
         var numbersRefresh by remember { mutableStateOf(0) }
@@ -305,6 +308,15 @@ private fun NationNumsApp(activity: MainActivity) {
                     notificationsLoading = false
                     notifications = records
                     notificationsError = if (result.success) "" else result.error ?: "Could not load notifications."
+                }
+            }
+            if (selectedTab == AppTab.Numbers) {
+                catalogLoading = true
+                catalogError = ""
+                repository.loadServiceCatalog { result, records ->
+                    catalogLoading = false
+                    serviceCatalog = records
+                    catalogError = if (result.success) "" else result.error ?: "Could not load the live service catalogue."
                 }
             }
             if (signedInUser != null && selectedTab == AppTab.Numbers) {
@@ -442,6 +454,9 @@ private fun NationNumsApp(activity: MainActivity) {
                     AppTab.Numbers -> ServicesScreen(
                         modifier = Modifier.padding(padding),
                         numbers = virtualNumbers,
+                        serviceCatalog = serviceCatalog,
+                        catalogLoading = catalogLoading,
+                        catalogError = catalogError,
                         numbersLoading = numbersLoading,
                         numbersError = numbersError,
                         isSignedIn = signedInUser != null,
@@ -1018,6 +1033,9 @@ private fun PageHeader(title: String, subtitle: String, modifier: Modifier = Mod
 private fun ServicesScreen(
     modifier: Modifier = Modifier,
     numbers: List<VirtualNumberRecord>,
+    serviceCatalog: List<ServiceCatalogRecord>,
+    catalogLoading: Boolean,
+    catalogError: String,
     numbersLoading: Boolean,
     numbersError: String,
     isSignedIn: Boolean,

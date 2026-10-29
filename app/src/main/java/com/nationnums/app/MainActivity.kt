@@ -101,6 +101,15 @@ private val NationBlue = Color(0xFF145DDB)
 private val Ink = Color(0xFF14213D)
 private val Muted = Color(0xFF6C7890)
 
+private fun latestWalletBalance(transactions: List<WalletTransactionRecord>): String? =
+    transactions.asSequence()
+        .filter { it.balanceAfter.toBigDecimalOrNull() != null }
+        .maxByOrNull { transaction ->
+            runCatching { java.time.Instant.parse(transaction.createdAt).toEpochMilli() }
+                .getOrDefault(Long.MIN_VALUE)
+        }
+        ?.balanceAfter
+
 private fun formatNairaAmount(rawAmount: String): String {
     val normalized = rawAmount.trim().replace(",", "").replace("₦", "").trim()
     val amount = normalized.toBigDecimalOrNull() ?: return "₦$rawAmount"
@@ -273,6 +282,7 @@ private fun NationNumsApp(activity: MainActivity) {
         var signedInUser by remember { mutableStateOf<Base44AuthApi.User?>(null) }
         var checkingSession by remember { mutableStateOf(true) }
         var walletTransactions by remember { mutableStateOf<List<WalletTransactionRecord>>(emptyList()) }
+        var walletBalance by remember { mutableStateOf<String?>(null) }
         var walletLoading by remember { mutableStateOf(false) }
         var walletError by remember { mutableStateOf("") }
         var walletRefresh by remember { mutableStateOf(0) }
@@ -309,12 +319,13 @@ private fun NationNumsApp(activity: MainActivity) {
                     numbersError = if (result.success) "" else result.error ?: "Could not load your numbers."
                 }
             }
-            if (signedInUser != null && selectedTab == AppTab.Wallet) {
+            if (signedInUser != null && (selectedTab == AppTab.Home || selectedTab == AppTab.Wallet)) {
                 walletLoading = true
                 walletError = ""
                 repository.loadWalletTransactions { result, records ->
                     walletLoading = false
                     walletTransactions = records
+                    walletBalance = if (result.success) latestWalletBalance(records) else null
                     walletError = if (result.success) "" else result.error ?: "Could not load transactions."
                 }
             }
@@ -417,6 +428,9 @@ private fun NationNumsApp(activity: MainActivity) {
                         modifier = Modifier.padding(padding),
                         signedIn = signedInUser != null,
                         displayName = signedInUser?.username?.takeIf { it.isNotBlank() } ?: signedInUser?.email?.substringBefore("@").orEmpty(),
+                        walletBalance = walletBalance,
+                        walletLoading = walletLoading,
+                        walletError = walletError,
                         onFund = { selectedTab = AppTab.Wallet },
                         onBuy = { selectedTab = AppTab.Numbers },
                         onOrders = { selectedTab = AppTab.Orders },
@@ -804,6 +818,9 @@ private fun Dashboard(
     modifier: Modifier = Modifier,
     signedIn: Boolean,
     displayName: String,
+    walletBalance: String?,
+    walletLoading: Boolean,
+    walletError: String,
     onFund: () -> Unit,
     onBuy: () -> Unit,
     onOrders: () -> Unit,
@@ -855,9 +872,18 @@ private fun Dashboard(
                         Spacer(Modifier.height(19.dp))
                         Text("WALLET BALANCE", color = Color.White.copy(alpha = .76f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
                         Spacer(Modifier.height(5.dp))
-                        Text("₦ — — —", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
                         Text(
-                            if (signedIn) "Balance is waiting for the verified wallet endpoint" else "Sign in to connect your live wallet",
+                            if (signedIn && walletBalance != null) formatNairaAmount(walletBalance) else "₦ — — —",
+                            color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            when {
+                                !signedIn -> "Sign in to connect your live wallet"
+                                walletLoading -> "Loading live wallet balance…"
+                                walletBalance != null -> "Live balance from your wallet ledger"
+                                walletError.isNotBlank() -> "Wallet balance could not be loaded. Open Wallet to retry."
+                                else -> "No wallet balance record is available yet"
+                            },
                             color = Color.White.copy(alpha = .82f), fontSize = 11.sp
                         )
                         Spacer(Modifier.height(17.dp))

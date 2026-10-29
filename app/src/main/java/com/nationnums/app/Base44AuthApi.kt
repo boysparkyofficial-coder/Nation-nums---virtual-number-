@@ -213,6 +213,86 @@ internal class Base44AuthApi(
         }
     }
 
+    data class ActionResult(
+        val success: Boolean,
+        val statusCode: Int,
+        val message: String = "",
+        val error: String? = null
+    )
+
+    fun register(email: String, password: String, callback: (ActionResult) -> Unit) {
+        postAuthAction(
+            "/auth/register",
+            JSONObject().put("email", email.trim()).put("password", password),
+            callback
+        )
+    }
+
+    fun verifyOtp(email: String, otpCode: String, callback: (ActionResult) -> Unit) {
+        postAuthAction(
+            "/auth/verify-otp",
+            JSONObject().put("email", email.trim()).put("otpCode", otpCode.trim()),
+            callback
+        )
+    }
+
+    fun requestPasswordReset(email: String, callback: (ActionResult) -> Unit) {
+        postAuthAction(
+            "/auth/reset-password-request",
+            JSONObject().put("email", email.trim()),
+            callback
+        )
+    }
+
+    private fun postAuthAction(
+        path: String,
+        payload: JSONObject,
+        callback: (ActionResult) -> Unit
+    ) {
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            val result = try {
+                connection = URL("$BASE_URL$path").openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 20000
+                connection.doOutput = true
+                connection.setRequestProperty("X-App-Id", APP_ID)
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
+                val status = connection.responseCode
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                val raw = stream?.let { input ->
+                    BufferedReader(InputStreamReader(input, StandardCharsets.UTF_8)).use { it.readText() }
+                }.orEmpty()
+                val serverMessage = try {
+                    val json = JSONObject(raw)
+                    listOf("message", "detail", "error")
+                        .firstNotNullOfOrNull { key -> json.optString(key).takeIf { it.isNotBlank() && it != "null" } }
+                        .orEmpty()
+                } catch (_: Exception) { "" }
+                if (status in 200..299) {
+                    ActionResult(true, status, serverMessage.ifBlank { "Request completed." })
+                } else {
+                    ActionResult(false, status, error = when (status) {
+                        400, 422 -> serverMessage.ifBlank { "Check the details you entered and try again." }
+                        401, 403 -> serverMessage.ifBlank { "This request could not be authorised." }
+                        404 -> "The Nation Nums authentication endpoint was not found. Please update the app or contact support."
+                        429 -> "Too many authentication attempts. Wait a little and try again."
+                        in 500..599 -> "Nation Nums authentication is temporarily unavailable. Please try again."
+                        else -> serverMessage.ifBlank { "Request failed (HTTP $status)." }
+                    })
+                }
+            } catch (_: Exception) {
+                ActionResult(false, 0, error = "Could not connect to the Nation Nums authentication service. The app is using the shared Base44 API host; please try again.")
+            } finally {
+                connection?.disconnect()
+            }
+            mainHandler.post { callback(result) }
+        }
+    }
+
     /** Validates a stored session and retrieves the current Base44 user. */
     fun currentUser(callback: (Result) -> Unit) {
         val token = sessionStore.readToken()
@@ -281,6 +361,6 @@ internal class Base44AuthApi(
 
     private companion object {
         const val APP_ID = "6ac1b21923bd8a65822f7956"
-        const val BASE_URL = "https://nation-nums.base44.app/api/apps/$APP_ID"
+        const val BASE_URL = "https://base44.app/api/apps/$APP_ID"
     }
 }

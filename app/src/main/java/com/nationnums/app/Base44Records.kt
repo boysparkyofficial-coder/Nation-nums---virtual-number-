@@ -19,6 +19,20 @@ internal data class WalletTransactionRecord(
     val createdAt: String
 )
 
+internal data class ServiceCatalogRecord(
+    val id: String,
+    val country: String,
+    val countryCode: String,
+    val flag: String,
+    val service: String,
+    val carrier: String,
+    val priceTemporary: String,
+    val priceRental: String,
+    val listedAs: String,
+    val available: Boolean,
+    val status: String
+)
+
 internal data class VirtualNumberRecord(
     val id: String,
     val phoneNumber: String,
@@ -80,6 +94,20 @@ internal object Base44RecordParser {
         createdAt = firstNonBlank(json, "created_date", "created_at")
     )
 
+    fun serviceCatalog(json: JSONObject) = ServiceCatalogRecord(
+        id = json.optString("id"),
+        country = json.optString("country"),
+        countryCode = firstNonBlank(json, "country_code"),
+        flag = json.optString("flag"),
+        service = json.optString("service"),
+        carrier = json.optString("carrier"),
+        priceTemporary = firstNonBlank(json, "price_temporary"),
+        priceRental = firstNonBlank(json, "price_rental"),
+        listedAs = firstNonBlank(json, "listed_as").ifBlank { "temporary" },
+        available = json.optBoolean("available", true),
+        status = firstNonBlank(json, "status").ifBlank { "active" }
+    )
+
     fun virtualNumber(json: JSONObject) = VirtualNumberRecord(
         id = json.optString("id"),
         phoneNumber = json.optString("phone_number"),
@@ -127,6 +155,16 @@ internal class NationNumsRepository(accessToken: () -> String?) {
     fun loadWalletTransactions(callback: (Base44Api.Result, List<WalletTransactionRecord>) -> Unit) {
         api.getEntityRecords("WalletTransaction") { result ->
             callback(result, if (result.success) Base44RecordParser.records(result.body).map(Base44RecordParser::walletTransaction) else emptyList())
+        }
+    }
+
+    fun loadServiceCatalog(callback: (Base44Api.Result, List<ServiceCatalogRecord>) -> Unit) {
+        api.getEntityRecords("ServiceCatalog", requireAuth = false) { result ->
+            val records = if (result.success) Base44RecordParser.records(result.body)
+                .map(Base44RecordParser::serviceCatalog)
+                .filter { it.available && it.status.equals("active", ignoreCase = true) }
+            else emptyList()
+            callback(result, records)
         }
     }
 

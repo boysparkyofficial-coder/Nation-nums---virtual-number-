@@ -14,12 +14,15 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 - Users create their own app password; only a salted PBKDF2 hash is stored.
 - Optional biometric unlock is available when the Android device reports a supported enrolled biometric.
 - The app uses its bundled Nation Nums launcher artwork in the app's brand mark. The exact logo asset from the live website still needs verification.
-- A native Base44 entity HTTP client now supports authenticated entity reads and record creation using the existing Nation Nums app ID. It requires a valid user access token and is not yet wired to the login flow or feature screens.
+- Base44 email/password authentication code and encrypted Android Keystore session storage are present.
+- The Base44 entity HTTP client is intentionally read-only and requires the user's access token. Feature screens still need verified entity names and backend function contracts before live operations can be enabled.
+- The API Documentation option opens the supplied developer reference externally: https://developer-nation-nums.base44.app/api-reference.
 
-## Not yet integrated
-- Base44 account authentication and Continue with Google.
-- Live wallet, payment, catalog, orders, OTP messages, account notifications and push notifications.
-- The exact live website logo asset has not yet been verified.
+## Remaining verification and integration
+- Confirm Base44 email/password authentication and session restoration against the live app.
+- Continue with Google native flow.
+- Live wallet, payment, catalog, purchases, orders, OTP messages, account notifications and push notifications must use the existing verified backend functions.
+- Exact live website logo and screen-by-screen visual parity still need verification.
 - Do not treat placeholder dashboard values as live account data.
 
 ## Backend rules

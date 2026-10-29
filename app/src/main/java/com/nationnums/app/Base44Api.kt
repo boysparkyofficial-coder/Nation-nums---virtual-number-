@@ -79,8 +79,8 @@ internal class Base44Api(
                     body,
                     if (status in 200..299) null else safeError(status)
                 )
-            } catch (_: Exception) {
-                Result(false, 0, "", "Could not reach Nation Nums. Check your internet connection and try again.")
+            } catch (e: Exception) {
+                Result(false, 0, "", "Backend connection failed (${e.javaClass.simpleName}). Check your internet connection and try again.")
             } finally {
                 connection?.disconnect()
             }

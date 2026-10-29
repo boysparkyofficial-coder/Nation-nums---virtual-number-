@@ -303,7 +303,7 @@ internal class Base44AuthApi(
         executor.execute {
             var connection: HttpURLConnection? = null
             val result = try {
-                connection = URL("$BASE_URL/entities/User/me").openConnection() as HttpURLConnection
+                connection = URL("$BASE_URL/auth/me").openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 12000
                 connection.readTimeout = 20000

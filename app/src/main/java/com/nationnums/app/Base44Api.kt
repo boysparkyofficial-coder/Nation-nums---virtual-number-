@@ -32,6 +32,7 @@ internal class Base44Api(
     fun getEntityRecords(
         entityName: String,
         query: Map<String, String> = emptyMap(),
+        requireAuth: Boolean = true,
         callback: (Result) -> Unit
     ) {
         requireSafeEntityName(entityName)
@@ -40,16 +41,16 @@ internal class Base44Api(
         }
         val path = "/entities/${encode(entityName)}" +
             if (queryString.isNotBlank()) "?$queryString" else ""
-        requestEntityRecords(path, callback)
+        requestEntityRecords(path, requireAuth, callback)
     }
 
     /**
      * Only GET requests to a validated entity collection are allowed here.
      * This intentionally prevents the client from mutating wallet or order data.
      */
-    private fun requestEntityRecords(path: String, callback: (Result) -> Unit) {
+    private fun requestEntityRecords(path: String, requireAuth: Boolean, callback: (Result) -> Unit) {
         val token = accessToken()?.trim().orEmpty()
-        if (token.isBlank()) {
+        if (requireAuth && token.isBlank()) {
             mainHandler.post {
                 callback(Result(false, 0, "", "Sign in to your Nation Nums account first."))
             }
@@ -64,7 +65,7 @@ internal class Base44Api(
                 connection.connectTimeout = CONNECT_TIMEOUT_MS
                 connection.readTimeout = READ_TIMEOUT_MS
                 connection.setRequestProperty("X-App-Id", APP_ID)
-                connection.setRequestProperty("Authorization", "Bearer $token")
+                if (token.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
                 connection.setRequestProperty("Accept", "application/json")
 
                 val status = connection.responseCode

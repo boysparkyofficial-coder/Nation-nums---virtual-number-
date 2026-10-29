@@ -17,6 +17,7 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 - Base44 email/password authentication code and encrypted Android Keystore session storage are present.
 - The Base44 entity HTTP client is intentionally read-only and requires the user's access token. The dashboard reads the latest available `balance_after` snapshot from the existing `WalletTransaction` ledger; it never invents a balance when no ledger snapshot is available. Wallet credits, purchases, and provider actions still require verified authenticated backend functions.
 - The API Documentation option opens the supplied developer reference externally: https://developer-nation-nums.base44.app/api-reference.
+- The native profile stays focused on core mobile needs; web-oriented API key management, team management and Telegram settings are intentionally not exposed as native screens.
 
 ## Remaining verification and integration
 - Confirm Base44 email/password authentication and session restoration against the live app.

@@ -204,8 +204,8 @@ internal class Base44AuthApi(
                         else -> "Could not sign in (HTTP $status). Please try again."
                     })
                 }
-            } catch (_: Exception) {
-                Result(false, 0, error = "Could not connect securely to Nation Nums. Check your internet and try again.")
+            } catch (e: Exception) {
+                Result(false, 0, error = "Network connection failed (${e.javaClass.simpleName}). Check your internet connection and try again.")
             } finally {
                 connection?.disconnect()
             }
@@ -284,8 +284,8 @@ internal class Base44AuthApi(
                         else -> serverMessage.ifBlank { "Request failed (HTTP $status)." }
                     })
                 }
-            } catch (_: Exception) {
-                ActionResult(false, 0, error = "Could not connect to the Nation Nums authentication service. The app is using the shared Base44 API host; please try again.")
+            } catch (e: Exception) {
+                ActionResult(false, 0, error = "Authentication connection failed (${e.javaClass.simpleName}). Check your internet connection and try again.")
             } finally {
                 connection?.disconnect()
             }
@@ -346,8 +346,8 @@ internal class Base44AuthApi(
                         else -> "Could not validate your session (HTTP $status)."
                     })
                 }
-            } catch (_: Exception) {
-                Result(false, 0, error = "Could not validate your session. Check your internet and try again.")
+            } catch (e: Exception) {
+                Result(false, 0, error = "Session check failed (${e.javaClass.simpleName}). Check your internet connection and try again.")
             } finally {
                 connection?.disconnect()
             }

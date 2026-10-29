@@ -13,6 +13,7 @@ internal data class WalletTransactionRecord(
     val id: String,
     val type: String,
     val amount: String,
+    val balanceAfter: String,
     val status: String,
     val description: String,
     val createdAt: String
@@ -73,6 +74,7 @@ internal object Base44RecordParser {
         id = json.optString("id"),
         type = firstNonBlank(json, "type").ifBlank { "unknown" },
         amount = firstNonBlank(json, "amount").ifBlank { "0" },
+        balanceAfter = firstNonBlank(json, "balance_after"),
         status = firstNonBlank(json, "status").ifBlank { "unknown" },
         description = json.optString("description"),
         createdAt = firstNonBlank(json, "created_date", "created_at")

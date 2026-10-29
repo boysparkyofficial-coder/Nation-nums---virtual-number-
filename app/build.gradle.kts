@@ -12,8 +12,8 @@ android {
         applicationId = "com.nationnums.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.20"
+        versionCode = 11
+        versionName = "1.0.21"
     }
 
     buildTypes {

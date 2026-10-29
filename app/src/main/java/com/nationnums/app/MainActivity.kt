@@ -1122,7 +1122,7 @@ private fun Dashboard(
 @Composable
 private fun BrandMark() {
     Image(
-        painter = painterResource(id = R.drawable.ic_launcher),
+        painter = painterResource(id = R.drawable.ic_launcher_logo),
         contentDescription = "Nation Nums logo",
         modifier = Modifier.size(46.dp)
     )

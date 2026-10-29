@@ -279,7 +279,7 @@ private fun NationNumsApp(activity: MainActivity) {
     } else {
         var selectedTab by remember { mutableStateOf(AppTab.Home) }
         var selectedPage by remember { mutableStateOf<ServicePage?>(null) }
-        var showSignIn by remember { mutableStateOf(false) }
+        var showSignIn by remember { mutableStateOf(sessionStore.readToken().isNullOrBlank()) }
         val authApi = remember { Base44AuthApi(sessionStore) }
         var signedInUser by remember { mutableStateOf<Base44AuthApi.User?>(null) }
         var checkingSession by remember { mutableStateOf(true) }
@@ -378,6 +378,7 @@ private fun NationNumsApp(activity: MainActivity) {
             authApi.currentUser { result ->
                 signedInUser = if (result.success) result.user else null
                 checkingSession = false
+                if (!result.success) showSignIn = true
             }
         }
 
@@ -529,7 +530,7 @@ private fun NationNumsApp(activity: MainActivity) {
                             virtualNumbers = emptyList()
                             smsMessages = emptyList()
                             notifications = emptyList()
-                            showSignIn = false
+                            showSignIn = true
                         }
                     )
                 }
@@ -572,11 +573,6 @@ private fun SignInScreen(
             .padding(horizontal = 22.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
-            Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = NationBlue)
-            Spacer(Modifier.width(8.dp))
-            Text("Back to app", color = NationBlue, fontWeight = FontWeight.SemiBold)
-        }
         Spacer(Modifier.height(28.dp))
         BrandMark()
         Spacer(Modifier.height(18.dp))
@@ -1299,8 +1295,39 @@ private fun ServicesScreen(
             }
         }
         item {
+            Text("LIVE CATALOGUE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+        }
+        if (catalogLoading) {
+            item { Text("Loading live services from Nation Nums…", color = Muted, fontSize = 13.sp) }
+        } else if (catalogError.isNotBlank()) {
+            item { InfoNotice(catalogError) }
+        } else if (serviceCatalog.isEmpty()) {
+            item { Text("No active catalogue entries were returned by the Nation Nums backend.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp) }
+        } else {
+            items(serviceCatalog, key = { "catalog-" + it.id }) { entry ->
+                val rawPrice = if (entry.listedAs.equals("rental", true)) entry.priceRental else entry.priceTemporary
+                Card(
+                    shape = RoundedCornerShape(15.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(entry.flag.ifBlank { "🌐" }, fontSize = 23.sp)
+                        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                            Text(entry.service.ifBlank { "Virtual number" }, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(listOf(entry.country, entry.carrier).filter { it.isNotBlank() }.joinToString(" · "), color = Muted, fontSize = 11.sp)
+                            Text(if (entry.listedAs.equals("rental", true)) "Rental" else "Temporary", color = Muted, fontSize = 10.sp)
+                        }
+                        Text(if (rawPrice.isNotBlank()) formatNairaAmount(rawPrice) else "Price unavailable", color = NationBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+        item {
             Spacer(Modifier.height(8.dp))
-            InfoNotice("Live availability and pricing will be loaded from Nation Nums after the provider and backend contracts are connected.")
+            InfoNotice("Prices and availability are read from the existing Nation Nums Base44 catalogue. Buying and renting remain disabled until the website's authenticated purchase functions are verified.")
         }
     }
 }

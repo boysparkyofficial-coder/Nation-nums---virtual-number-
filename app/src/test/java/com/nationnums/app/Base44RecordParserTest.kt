@@ -10,12 +10,13 @@ class Base44RecordParserTest {
     @Test
     fun parsesArrayResponse() {
         val result = Base44RecordParser.records(
-            """[{"id":"tx-1","type":"deposit","amount":2500,"status":"success","description":"Wallet funding"}]"""
+            """[{"id":"tx-1","type":"deposit","amount":2500,"balance_after":7250,"status":"completed","description":"Wallet funding","created_date":"2026-10-29T05:00:00Z"}]"""
         )
         assertEquals(1, result.size)
         assertEquals("tx-1", Base44RecordParser.walletTransaction(result[0]).id)
         assertEquals("deposit", Base44RecordParser.walletTransaction(result[0]).type)
         assertEquals("2500", Base44RecordParser.walletTransaction(result[0]).amount)
+        assertEquals("7250", Base44RecordParser.walletTransaction(result[0]).balanceAfter)
     }
 
     @Test

@@ -10,8 +10,8 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 
 ## Current implementation
 - Native blue-and-white dashboard and navigation.
-- App-only local password gate appears before the dashboard on first setup and when returning to the app after leaving it.
-- Users create their own app password; only a salted PBKDF2 hash is stored.
+- Account sign-in is the first step for users without an existing session. Device-only app passcode and biometric unlock are optional settings available after sign-in.
+- Users create their own app passcode; only a salted PBKDF2 hash is stored.
 - Optional biometric unlock is available when the Android device reports a supported enrolled biometric.
 - The app uses its bundled Nation Nums launcher artwork in the app's brand mark. The exact logo asset from the live website still needs verification.
 - Base44 email/password authentication code and encrypted Android Keystore session storage are present.
@@ -20,7 +20,7 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 - The native profile stays focused on core mobile needs; web-oriented API key management, team management and Telegram settings are intentionally not exposed as native screens.
 
 ## Remaining verification and integration
-- Confirm Base44 email/password authentication and session restoration against the live app.
+- Confirm Base44 email/password authentication, current-user validation via `/auth/me`, and session restoration against the live app.
 - Continue with Google native flow.
 - Live wallet, payment, catalog, purchases, orders, OTP messages, account notifications and push notifications must use the existing verified backend functions.
 - Exact live website logo and screen-by-screen visual parity still need verification.

@@ -465,6 +465,7 @@ private fun NationNumsApp(activity: MainActivity) {
                     AppTab.Wallet -> WalletScreen(
                         modifier = Modifier.padding(padding),
                         transactions = walletTransactions,
+                        walletBalance = walletBalance,
                         isLoading = walletLoading,
                         errorMessage = walletError,
                         isSignedIn = signedInUser != null,
@@ -484,6 +485,11 @@ private fun NationNumsApp(activity: MainActivity) {
                         onSignOut = {
                             authApi.logout()
                             signedInUser = null
+                            walletTransactions = emptyList()
+                            walletBalance = null
+                            virtualNumbers = emptyList()
+                            smsMessages = emptyList()
+                            notifications = emptyList()
                             showSignIn = false
                         }
                     )
@@ -1297,6 +1303,7 @@ private fun OrdersScreen(
 private fun WalletScreen(
     modifier: Modifier = Modifier,
     transactions: List<WalletTransactionRecord>,
+    walletBalance: String?,
     isLoading: Boolean,
     errorMessage: String,
     isSignedIn: Boolean,
@@ -1310,8 +1317,20 @@ private fun WalletScreen(
                 Column(Modifier.fillMaxWidth().padding(22.dp)) {
                     Text("AVAILABLE BALANCE", color = Color.White.copy(alpha = .8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text("Not available", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text(if (isSignedIn) "Balance display needs a verified balance endpoint" else "Sign in to view account activity", color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
+                    Text(
+                        if (isSignedIn && walletBalance != null) formatNairaAmount(walletBalance) else "₦ — — —",
+                        color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        when {
+                            !isSignedIn -> "Sign in to view account activity"
+                            isLoading -> "Refreshing your wallet ledger…"
+                            walletBalance != null -> "Balance from your Nation Nums wallet ledger"
+                            errorMessage.isNotBlank() -> "Balance could not be loaded. Refresh to retry."
+                            else -> "No balance snapshot is available yet"
+                        },
+                        color = Color.White.copy(alpha = .85f), fontSize = 12.sp
+                    )
                 }
             }
         }

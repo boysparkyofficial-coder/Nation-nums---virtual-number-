@@ -106,7 +106,7 @@ internal class Base44Api(
         URLEncoder.encode(value, Charsets.UTF_8.name())
 
     private companion object {
-        const val BASE_URL = "https://nation-nums.base44.app/api/apps/6ac1b21923bd8a65822f7956"
+        const val BASE_URL = "https://base44.app/api/apps/6ac1b21923bd8a65822f7956"
         const val APP_ID = "6ac1b21923bd8a65822f7956"
         const val CONNECT_TIMEOUT_MS = 12_000
         const val READ_TIMEOUT_MS = 20_000

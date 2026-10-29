@@ -179,8 +179,12 @@ private enum class GateState { Setup, Locked, Dashboard }
 @Composable
 private fun NationNumsApp(activity: MainActivity) {
     val lockStore = remember { AppLockStore(activity) }
+    val sessionStore = remember { Base44SessionStore(activity) }
     var gateState by remember {
-        mutableStateOf(if (lockStore.isConfigured()) GateState.Locked else GateState.Setup)
+        mutableStateOf(
+            if (lockStore.isConfigured() && !sessionStore.readToken().isNullOrBlank())
+                GateState.Locked else GateState.Dashboard
+        )
     }
     var gateError by remember { mutableStateOf("") }
     val biometricAvailable = remember {
@@ -190,7 +194,9 @@ private fun NationNumsApp(activity: MainActivity) {
 
     LaunchedEffect(activity.shouldLockOnResume) {
         if (activity.shouldLockOnResume) {
-            if (gateState == GateState.Dashboard) {
+            if (gateState == GateState.Dashboard &&
+                lockStore.isConfigured() && !sessionStore.readToken().isNullOrBlank()
+            ) {
                 gateState = GateState.Locked
                 gateError = ""
             }
@@ -274,7 +280,6 @@ private fun NationNumsApp(activity: MainActivity) {
         var selectedTab by remember { mutableStateOf(AppTab.Home) }
         var selectedPage by remember { mutableStateOf<ServicePage?>(null) }
         var showSignIn by remember { mutableStateOf(false) }
-        val sessionStore = remember { Base44SessionStore(activity) }
         val authApi = remember { Base44AuthApi(sessionStore) }
         var signedInUser by remember { mutableStateOf<Base44AuthApi.User?>(null) }
         var checkingSession by remember { mutableStateOf(true) }
@@ -383,6 +388,21 @@ private fun NationNumsApp(activity: MainActivity) {
         if (showSignIn) {
             SignInScreen(
                 onBack = { showSignIn = false },
+                onRegister = { email, password, complete ->
+                    authApi.register(email, password) { result ->
+                        complete(if (result.success) null else result.error ?: "Account creation failed.")
+                    }
+                },
+                onVerifyOtp = { email, code, complete ->
+                    authApi.verifyOtp(email, code) { result ->
+                        complete(if (result.success) null else result.error ?: "Email verification failed.")
+                    }
+                },
+                onForgotPassword = { email, complete ->
+                    authApi.requestPasswordReset(email) { result ->
+                        complete(if (result.success) null else result.error ?: "Password reset request failed.")
+                    }
+                },
                 onLogin = { email, password, rememberMe, complete ->
                     authApi.login(email, password, rememberMe) { result ->
                         complete(if (result.success) null else result.error ?: "Sign-in failed.")
@@ -429,7 +449,14 @@ private fun NationNumsApp(activity: MainActivity) {
                 ServiceDetailPage(
                     page = selectedPage!!,
                     onBack = { selectedPage = null },
-                    onSignIn = { showSignIn = true }
+                    onSignIn = { showSignIn = true },
+                    onSetupLock = {
+                        selectedPage = null
+                        gateError = ""
+                        gateState = GateState.Setup
+                    },
+                    lockConfigured = lockStore.isConfigured(),
+                    biometricAvailable = biometricAvailable
                 )
             } else {
                 when (selectedTab) {
@@ -515,13 +542,30 @@ private fun NationNumsApp(activity: MainActivity) {
 @Composable
 private fun SignInScreen(
     onBack: () -> Unit,
-    onLogin: (String, String, Boolean, (String?) -> Unit) -> Unit
+    onLogin: (String, String, Boolean, (String?) -> Unit) -> Unit,
+    onRegister: (String, String, (String?) -> Unit) -> Unit,
+    onVerifyOtp: (String, String, (String?) -> Unit) -> Unit,
+    onForgotPassword: (String, (String?) -> Unit) -> Unit
 ) {
+    var mode by remember { mutableStateOf("login") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var otp by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(true) }
+    var showPassword by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    var successMessage by remember { mutableStateOf("") }
+
+    fun runAction(action: ((String?) -> Unit) -> Unit, onSuccess: () -> Unit) {
+        busy = true
+        message = ""
+        successMessage = ""
+        action { error ->
+            busy = false
+            if (error == null) onSuccess() else message = error
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().background(Canvas).verticalScroll(rememberScrollState())
@@ -536,46 +580,119 @@ private fun SignInScreen(
         Spacer(Modifier.height(28.dp))
         BrandMark()
         Spacer(Modifier.height(18.dp))
-        Text("Sign in to Nation Nums", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text(
+            when (mode) {
+                "register" -> "Create your account"
+                "verify" -> "Verify your email"
+                "forgot" -> "Reset your password"
+                else -> "Sign in to Nation Nums"
+            },
+            color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold
+        )
         Spacer(Modifier.height(8.dp))
-        Text("Use the same email and password you use on the Nation Nums website.", color = Muted, fontSize = 14.sp, lineHeight = 20.sp)
+        Text(
+            when (mode) {
+                "register" -> "Create a Nation Nums account. We'll send a verification code to your email."
+                "verify" -> "Enter the one-time code sent to $email to verify your account."
+                "forgot" -> "Enter your account email and we'll send password-reset instructions if the account exists."
+                else -> "Use the same email and password as the Nation Nums website."
+            },
+            color = Muted, fontSize = 14.sp, lineHeight = 20.sp
+        )
         Spacer(Modifier.height(24.dp))
-        OutlinedTextField(
-            value = email, onValueChange = { email = it; message = "" },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            label = { Text("Email address") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            shape = RoundedCornerShape(14.dp)
-        )
-        Spacer(Modifier.height(14.dp))
-        OutlinedTextField(
-            value = password, onValueChange = { password = it; message = "" },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            shape = RoundedCornerShape(14.dp)
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { rememberMe = !rememberMe }) {
-            Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
-            Column {
-                Text("Remember me", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text(if (rememberMe) "Keep the encrypted session on this device." else "Session stays in memory and is not saved after closing the app.", color = Muted, fontSize = 11.sp)
+        if (mode != "verify") {
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it; message = ""; successMessage = "" },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Email address") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(14.dp)
+            )
+        }
+        if (mode == "login" || mode == "register") {
+            Spacer(Modifier.height(14.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it; message = "" },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text(if (mode == "register") "Create password" else "Password") },
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            if (showPassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = if (showPassword) "Hide password" else "Show password"
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                shape = RoundedCornerShape(14.dp)
+            )
+            if (mode == "register") {
+                Spacer(Modifier.height(5.dp))
+                Text("Use at least 8 characters for your password.", color = Muted, fontSize = 11.sp)
+            }
+        }
+        if (mode == "verify") {
+            OutlinedTextField(
+                value = otp, onValueChange = { otp = it.filter(Char::isDigit).take(8); message = "" },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Email verification code") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                shape = RoundedCornerShape(14.dp)
+            )
+        }
+        if (mode == "login") {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { rememberMe = !rememberMe }) {
+                Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+                Column {
+                    Text("Remember me", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(if (rememberMe) "Keep the encrypted session on this device." else "Session stays in memory and is not saved after closing the app.", color = Muted, fontSize = 11.sp)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Text("Forgot password?", color = NationBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { mode = "forgot"; message = ""; successMessage = "" }.padding(vertical = 8.dp))
             }
         }
         if (message.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(message, color = Color(0xFFB42318), fontSize = 13.sp, lineHeight = 18.sp)
         }
+        if (successMessage.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(successMessage, color = Green, fontSize = 13.sp, lineHeight = 18.sp)
+        }
         Spacer(Modifier.height(18.dp))
         Button(
             onClick = {
-                if (email.isBlank() || password.isBlank()) {
-                    message = "Enter your email and password."
-                } else {
-                    busy = true
-                    message = ""
-                    onLogin(email, password, rememberMe) { error ->
-                        busy = false
-                        message = error.orEmpty()
+                when (mode) {
+                    "login" -> {
+                        if (email.isBlank() || password.isBlank()) message = "Enter your email and password."
+                        else runAction({ done -> onLogin(email, password, rememberMe, done) }) { }
+                    }
+                    "register" -> {
+                        if (email.isBlank() || password.length < 8) message = "Enter a valid email and a password with at least 8 characters."
+                        else runAction({ done -> onRegister(email, password, done) }) {
+                            mode = "verify"
+                            successMessage = "Account created. Check your email for the verification code."
+                        }
+                    }
+                    "verify" -> {
+                        if (otp.isBlank()) message = "Enter the verification code from your email."
+                        else runAction({ done -> onVerifyOtp(email, otp, done) }) {
+                            mode = "login"
+                            password = ""
+                            otp = ""
+                            successMessage = "Email verified. You can now sign in."
+                        }
+                    }
+                    "forgot" -> {
+                        if (email.isBlank()) message = "Enter your account email address."
+                        else runAction({ done -> onForgotPassword(email, done) }) {
+                            successMessage = "If an account exists for that email, password-reset instructions have been sent."
+                        }
                     }
                 }
             },
@@ -583,10 +700,30 @@ private fun SignInScreen(
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(14.dp)
         ) {
-            Text(if (busy) "Signing in…" else "Sign in securely", fontWeight = FontWeight.Bold)
+            Text(
+                if (busy) "Please wait…" else when (mode) {
+                    "register" -> "Create account"
+                    "verify" -> "Verify email"
+                    "forgot" -> "Send reset instructions"
+                    else -> "Sign in securely"
+                },
+                fontWeight = FontWeight.Bold
+            )
         }
         Spacer(Modifier.height(14.dp))
-        Text("Your password is sent only to the Nation Nums Base44 sign-in endpoint over HTTPS. The app does not create or modify wallet records directly.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        when (mode) {
+            "login" -> Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                Text("Don't have an account? ", color = Muted, fontSize = 13.sp)
+                Text("Create account", color = NationBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { mode = "register"; message = ""; successMessage = "" })
+            }
+            "register" -> Text("Already have an account? Sign in", color = NationBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.CenterHorizontally).clickable { mode = "login"; message = ""; successMessage = "" })
+            else -> Text("Back to sign in", color = NationBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.CenterHorizontally).clickable { mode = "login"; message = ""; successMessage = "" })
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("Your account is authenticated by the existing Nation Nums Base44 backend. App passcode and biometric reauthentication can be configured after sign-in in Profile → Security.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
     }
 }
 
@@ -1548,7 +1685,7 @@ private fun NotificationsScreen(
 }
 
 @Composable
-private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: () -> Unit) {
+private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: () -> Unit, onSetupLock: () -> Unit, lockConfigured: Boolean, biometricAvailable: Boolean) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
@@ -1572,6 +1709,25 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                 else -> "This page is part of the native app structure. Live data and actions will be enabled after the existing Nation Nums backend is connected and tested."
             })
             Spacer(Modifier.height(18.dp))
+        }
+        if (page == ServicePage.Security) {
+            item {
+                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = androidx.compose.foundation.BorderStroke(1.dp, Border)) {
+                    Column(Modifier.padding(18.dp)) {
+                        Text("App reauthentication", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(Modifier.height(7.dp))
+                        Text(
+                            if (lockConfigured) "A device passcode is configured. You can change it here. " + (if (biometricAvailable) "Biometric authentication is supported on this device." else "Biometric authentication is not available on this device.")
+                            else "Optional: create a device-only passcode and optionally enable biometrics. This is separate from your Nation Nums account password.",
+                            color = Muted, fontSize = 13.sp, lineHeight = 19.sp
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        Button(onClick = onSetupLock, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                            Text(if (lockConfigured) "Change app passcode" else "Set up app passcode")
+                        }
+                    }
+                }
+            }
         }
         item {
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {

@@ -1430,15 +1430,12 @@ private fun ProfileScreen(
         }
         item { ServiceRow("Security", "Password, sessions and biometric options", Icons.Rounded.Shield) { onOpen(ServicePage.Security) } }
         item { ServiceRow("Notifications", "Order and wallet updates", Icons.Rounded.Notifications) { onOpen(ServicePage.Notifications) } }
-        item { ServiceRow("Telegram settings", "Linking and supported alerts", Icons.Rounded.Settings) { onOpen(ServicePage.Telegram) } }
         item {
             Spacer(Modifier.height(15.dp))
             Text("TOOLS & SUPPORT", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
         }
-        item { ServiceRow("API key management", "Manage supported API access", Icons.Rounded.Shield) { onOpen(ServicePage.ApiKeys) } }
         item { ServiceRow("API Documentation", "Open the official documentation website", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Documentation) } }
-        item { ServiceRow("Team management", "Team members and access permissions", Icons.Rounded.AccountCircle) { onOpen(ServicePage.Team) } }
         item { ServiceRow("Help & support", "Support tickets and contact options", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Support) } }
         item { ServiceRow("FAQs", "Common questions", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Faq) } }
         item { ServiceRow("Policies & app information", "Privacy policy, terms and version", Icons.Rounded.Settings) { onOpen(ServicePage.Legal) } }

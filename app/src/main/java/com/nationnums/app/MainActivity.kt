@@ -104,10 +104,7 @@ private val Muted = Color(0xFF6C7890)
 private fun latestWalletBalance(transactions: List<WalletTransactionRecord>): String? =
     transactions.asSequence()
         .filter { it.balanceAfter.toBigDecimalOrNull() != null }
-        .maxByOrNull { transaction ->
-            runCatching { java.time.Instant.parse(transaction.createdAt).toEpochMilli() }
-                .getOrDefault(Long.MIN_VALUE)
-        }
+        .maxByOrNull { transaction -> transaction.createdAt }
         ?.balanceAfter
 
 private fun formatNairaAmount(rawAmount: String): String {

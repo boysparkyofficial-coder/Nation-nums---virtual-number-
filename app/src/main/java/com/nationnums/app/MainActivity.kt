@@ -424,7 +424,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         onProfile = { selectedTab = AppTab.Profile },
                         onService = { page ->
                             if (page == ServicePage.Documentation) {
-                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://nation-nums.base44.app/docs"))) }
+                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://developer-nation-nums.base44.app/api-reference"))) }
                             } else selectedPage = page
                         }
                     )
@@ -463,7 +463,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         checkingSession = checkingSession,
                         onOpen = { page ->
                             if (page == ServicePage.Documentation) {
-                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://nation-nums.base44.app/docs"))) }
+                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://developer-nation-nums.base44.app/api-reference"))) }
                             } else selectedPage = page
                         },
                         onSignIn = { showSignIn = true },

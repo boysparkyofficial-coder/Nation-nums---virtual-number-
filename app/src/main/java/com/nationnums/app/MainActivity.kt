@@ -163,6 +163,8 @@ private enum class ServicePage(val title: String, val subtitle: String) {
     Rentals("Rent a number", "View available rental durations"),
     EmailOtp("Email OTP", "Email verification services"),
     Proxies("Proxy services", "Browse supported proxy options"),
+    SocialMediaLogs("Social media accounts", "Eligible account listings from YoungPG Media"),
+    VirtualTopUp("Virtual top-up", "Airtime, data and supported bill payments"),
     Notifications("Notifications", "Updates for your account"),
     Support("Help & support", "Get help with your account"),
     Security("Security", "Protect your Nation Nums account"),
@@ -1183,7 +1185,9 @@ private fun ServicesScreen(
         Triple(ServicePage.UsNumbers, "Buy US numbers", "Explore supported US options"),
         Triple(ServicePage.Rentals, "Rent a number", "Longer-use options where available"),
         Triple(ServicePage.EmailOtp, "Email OTP", "Email verification services"),
-        Triple(ServicePage.Proxies, "Proxy services", "Available proxy products")
+        Triple(ServicePage.Proxies, "Proxy services", "Available proxy products"),
+        Triple(ServicePage.SocialMediaLogs, "Social media accounts", "Eligible listings supplied by YoungPG Media"),
+        Triple(ServicePage.VirtualTopUp, "Virtual top-up", "Airtime, data and supported bill payments")
     )
     val filteredServices = services.filter {
         it.second.contains(query, ignoreCase = true) || it.third.contains(query, ignoreCase = true)
@@ -1729,6 +1733,8 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
         item {
             InfoNotice(when (page) {
                 ServicePage.ApiKeys -> "API key management is separate from API Documentation. The real key list and key actions must be connected to the verified backend before use."
+                ServicePage.SocialMediaLogs -> "Only account listings actually supplied by YoungPG Media and legitimately transferable will be shown. Live catalogue, prices and purchase actions must be connected to the verified backend before use."
+                ServicePage.VirtualTopUp -> "The VTU marketplace is being prepared. BillsJet is still under consideration because registration is unavailable; do not accept payments until a provider API is selected and tested."
                 ServicePage.Notifications -> "Your real notifications will appear after account and push-notification integration is completed."
                 ServicePage.Security -> "Security settings will use the existing account system. Passwords and private keys will not be stored in plain text."
                 ServicePage.Support -> "Support ticket history and replies will load after the existing support endpoints are verified."

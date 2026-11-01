@@ -161,6 +161,7 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
 
 private enum class ServicePage(val title: String, val subtitle: String) {
     VirtualNumbers("Buy virtual numbers", "Choose a country and service"),
+    QrNumbers("Buy by QR number", "Browse supported QR-number options"),
     UsNumbers("Buy US numbers", "Browse supported US-number options"),
     Rentals("Rent a number", "View available rental durations"),
     EmailOtp("Email OTP", "Email verification services"),
@@ -1003,6 +1004,7 @@ private fun Dashboard(
     )
     val quickLinks = listOf(
         Triple("Buy virtual number", "SMS verification", ServicePage.VirtualNumbers),
+        Triple("Buy by QR number", "QR number options", ServicePage.QrNumbers),
         Triple("Buy US number", "US number options", ServicePage.UsNumbers),
         Triple("Rent a number", "Longer access", ServicePage.Rentals),
         Triple("Email OTP", "Email verification", ServicePage.EmailOtp),
@@ -1070,7 +1072,7 @@ private fun Dashboard(
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                             row.forEach { (title, subtitle, page) ->
                                 QuickAction(title, subtitle, when (page) {
-                                    ServicePage.VirtualNumbers, ServicePage.UsNumbers -> Icons.Rounded.PhoneAndroid
+                                    ServicePage.VirtualNumbers, ServicePage.QrNumbers, ServicePage.UsNumbers -> Icons.Rounded.PhoneAndroid
                                     ServicePage.Rentals -> Icons.Rounded.History
                                     ServicePage.EmailOtp -> Icons.Rounded.CheckCircle
                                     ServicePage.Proxies -> Icons.Rounded.Shield
@@ -1088,7 +1090,7 @@ private fun Dashboard(
         if (openingPage != null) {
             Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .96f)), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(painter = painterResource(id = R.drawable.ic_launcher_logo), contentDescription = "Nation Nums logo loading", modifier = Modifier.size(78.dp).graphicsLayer { rotationZ = rotation }, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(when (openingPage) { ServicePage.EmailOtp -> Color(0xFF7C3AED); ServicePage.Proxies -> Color(0xFF0F766E); ServicePage.SocialMediaLogs -> Color(0xFFDB2777); ServicePage.VirtualTopUp -> Color(0xFFEA580C); ServicePage.Rentals -> Color(0xFF2563EB); ServicePage.UsNumbers -> Color(0xFF0891B2); else -> NationBlue }))
+                    Image(painter = painterResource(id = R.drawable.ic_launcher_logo), contentDescription = "Nation Nums logo loading", modifier = Modifier.size(78.dp).graphicsLayer { rotationZ = rotation }, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(when (openingPage) { ServicePage.EmailOtp -> Color(0xFF7C3AED); ServicePage.Proxies -> Color(0xFF0F766E); ServicePage.SocialMediaLogs -> Color(0xFFDB2777); ServicePage.VirtualTopUp -> Color(0xFFEA580C); ServicePage.Rentals -> Color(0xFF2563EB); ServicePage.UsNumbers, ServicePage.QrNumbers -> Color(0xFF0891B2); else -> NationBlue }))
                     Spacer(Modifier.height(15.dp))
                     Text("Opening ${openingPage!!.title}…", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }

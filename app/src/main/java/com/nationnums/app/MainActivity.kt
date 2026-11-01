@@ -1088,7 +1088,7 @@ private fun Dashboard(
         if (openingPage != null) {
             Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .96f)), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(painter = painterResource(id = R.drawable.ic_launcher_logo), contentDescription = "Nation Nums logo loading", modifier = Modifier.size(78.dp).graphicsLayer { rotationZ = rotation })
+                    Image(painter = painterResource(id = R.drawable.ic_launcher_logo), contentDescription = "Nation Nums logo loading", modifier = Modifier.size(78.dp).graphicsLayer { rotationZ = rotation }, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(when (openingPage) { ServicePage.EmailOtp -> Color(0xFF7C3AED); ServicePage.Proxies -> Color(0xFF0F766E); ServicePage.SocialMediaLogs -> Color(0xFFDB2777); ServicePage.VirtualTopUp -> Color(0xFFEA580C); ServicePage.Rentals -> Color(0xFF2563EB); ServicePage.UsNumbers -> Color(0xFF0891B2); else -> NationBlue }))
                     Spacer(Modifier.height(15.dp))
                     Text("Opening ${openingPage!!.title}…", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }

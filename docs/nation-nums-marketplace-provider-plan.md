@@ -34,7 +34,7 @@ PipeSync was also named by the user as a provider they no longer need and must n
 ## Current integration readiness
 
 - OTPWave: adapter is being wired; its API key must be entered in Base44 Secrets before its connection test can pass.
-- EasyNums: selected; adapter work is in progress and requires its API key in Base44 Secrets.
+- EasyNums: selected and already registered in the live Base44 `ProviderServer` registry as `server8` (customer-facing label `Server F`). The record is NGN, enabled and visible, with `sms_otp` and `us_number` enabled; Base44 reports `configuration_status=configured`, `connection_status=connected`, and `last_check=2026-11-01T05:47:11Z`. The credential reference is `EASYNUMS_API_KEY` and must remain in Base44 Secrets only. The official EasyNums homepage links its API documentation to the public Postman collection at https://documenter.getpostman.com/view/48935302/2sB3QFRYLG; the collection body could not be extracted in this review, so do not invent or change endpoints until the full Postman contract is checked. Important: the 35 current `ServiceCatalog` records tagged `operators=virtual8` are all Canada-only and were last updated 2026-10-28. Treat that catalogue as stale/incomplete; refresh countries, services, live stock and prices through the existing Base44 backend before relying on it for customer offers.
 - TempNumber.ng: selected; adapter work is in progress and requires its reseller API key in Base44 Secrets. Its catalogue must remain API-driven; do not impose a hardcoded country restriction.
 - AccNumbers: selected in the provider roster, but keep it disabled/awaiting API documentation and credentials until the official integration contract is available.
 - SMSvirtual.io: hold/disabled while undecided.

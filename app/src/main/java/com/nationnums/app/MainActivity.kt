@@ -1160,6 +1160,7 @@ private fun ServicesScreen(
     var query by remember { mutableStateOf("") }
     val services = listOf(
         Triple(ServicePage.VirtualNumbers, "Buy virtual numbers", "Choose a country and service"),
+        Triple(ServicePage.QrNumbers, "Buy by QR number", "Explore supported QR-number options"),
         Triple(ServicePage.UsNumbers, "Buy US numbers", "Explore supported US options"),
         Triple(ServicePage.Rentals, "Rent a number", "Longer-use options where available"),
         Triple(ServicePage.EmailOtp, "Email OTP", "Email verification services"),

@@ -76,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -981,42 +982,58 @@ private fun Dashboard(
     onProfile: () -> Unit,
     onService: (ServicePage) -> Unit
 ) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
-        contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                BrandMark()
-                Column(Modifier.weight(1f).padding(start = 11.dp)) {
-                    Text("Nation Nums", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
-                    Text("Your numbers. One dashboard.", fontSize = 12.sp, color = Muted)
-                }
-                IconButton(onClick = onNotifications) {
-                    Icon(Icons.Rounded.Notifications, contentDescription = "Notifications", tint = NationBlue)
-                }
-                IconButton(onClick = onProfile) {
-                    Icon(Icons.Rounded.AccountCircle, contentDescription = "Profile", tint = NationBlue)
+    var openingPage by remember { mutableStateOf<ServicePage?>(null) }
+    LaunchedEffect(openingPage) {
+        val page = openingPage
+        if (page != null) {
+            kotlinx.coroutines.delay(650)
+            onService(page)
+            openingPage = null
+        }
+    }
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "brandLogoSpin")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing)
+        ),
+        label = "brandLogoRotation"
+    )
+    val quickLinks = listOf(
+        Triple("Buy virtual number", "SMS verification", ServicePage.VirtualNumbers),
+        Triple("Buy US number", "US number options", ServicePage.UsNumbers),
+        Triple("Rent a number", "Longer access", ServicePage.Rentals),
+        Triple("Email OTP", "Email verification", ServicePage.EmailOtp),
+        Triple("Proxy services", "Proxy marketplace", ServicePage.Proxies),
+        Triple("Social media logs", "Available account listings", ServicePage.SocialMediaLogs),
+        Triple("VTU services", "Airtime and data", ServicePage.VirtualTopUp)
+    )
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+            contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    BrandMark()
+                    Column(Modifier.weight(1f).padding(start = 11.dp)) {
+                        Text("Nation Nums", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
+                        Text("Your numbers. One dashboard.", fontSize = 12.sp, color = Muted)
+                    }
+                    IconButton(onClick = onNotifications) { Icon(Icons.Rounded.Notifications, contentDescription = "Notifications", tint = NationBlue) }
+                    IconButton(onClick = onProfile) { Icon(Icons.Rounded.AccountCircle, contentDescription = "Profile", tint = NationBlue) }
                 }
             }
-        }
-        item {
-            Card(
-                shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = NationBlue),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box {
+            item {
+                Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = NationBlue), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(22.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(if (signedIn) "WELCOME BACK" else "YOUR NATION NUMS ACCOUNT", color = Color.White.copy(alpha = .78f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
                                 Spacer(Modifier.height(6.dp))
-                                Text(
-                                    if (signedIn && displayName.isNotBlank()) "Hello, $displayName" else if (signedIn) "Your workspace is ready" else "Everything in one place",
-                                    color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 29.sp
-                                )
+                                Text(if (signedIn && displayName.isNotBlank()) "Hello, $displayName" else if (signedIn) "Your workspace is ready" else "Everything in one place", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 29.sp)
                             }
                             Box(Modifier.size(52.dp).background(Color.White.copy(alpha = .15f), CircleShape), contentAlignment = Alignment.Center) {
                                 Icon(Icons.Rounded.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
@@ -1025,96 +1042,54 @@ private fun Dashboard(
                         Spacer(Modifier.height(19.dp))
                         Text("WALLET BALANCE", color = Color.White.copy(alpha = .76f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
                         Spacer(Modifier.height(5.dp))
-                        Text(
-                            if (signedIn && walletBalance != null) formatNairaAmount(walletBalance) else "₦ — — —",
-                            color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            when {
-                                !signedIn -> "Sign in to connect your live wallet"
-                                walletLoading -> "Loading live wallet balance…"
-                                walletBalance != null -> "Live balance from your wallet ledger"
-                                walletError.isNotBlank() -> "Wallet balance could not be loaded. Open Wallet to retry."
-                                else -> "No wallet balance record is available yet"
-                            },
-                            color = Color.White.copy(alpha = .82f), fontSize = 11.sp
-                        )
+                        Text(if (signedIn && walletBalance != null) formatNairaAmount(walletBalance) else "₦ — — —", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(when {
+                            !signedIn -> "Sign in to connect your live wallet"
+                            walletLoading -> "Loading live wallet balance…"
+                            walletBalance != null -> "Live balance from your wallet ledger"
+                            walletError.isNotBlank() -> "Wallet balance could not be loaded. Open Wallet to retry."
+                            else -> "No wallet balance record is available yet"
+                        }, color = Color.White.copy(alpha = .82f), fontSize = 11.sp)
                         Spacer(Modifier.height(17.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(
-                                onClick = onFund,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = NationBlue),
-                                shape = RoundedCornerShape(13.dp),
-                                modifier = Modifier.weight(1f).height(47.dp)
-                            ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Fund wallet", fontWeight = FontWeight.Bold)
+                            Button(onClick = onFund, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = NationBlue), shape = RoundedCornerShape(13.dp), modifier = Modifier.weight(1f).height(47.dp)) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Fund wallet", fontWeight = FontWeight.Bold)
                             }
-                            OutlinedButton(
-                                onClick = onOrders,
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .65f)),
-                                shape = RoundedCornerShape(13.dp),
-                                modifier = Modifier.weight(1f).height(47.dp)
-                            ) { Text("View orders", fontWeight = FontWeight.SemiBold) }
+                            OutlinedButton(onClick = onOrders, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White), border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .65f)), shape = RoundedCornerShape(13.dp), modifier = Modifier.weight(1f).height(47.dp)) { Text("View orders", fontWeight = FontWeight.SemiBold) }
                         }
                     }
                 }
             }
-        }
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Quick actions", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Jump straight to what you need", color = Muted, fontSize = 12.sp)
-                }
-                Text("See all", color = NationBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onBuy() })
-            }
-            Spacer(Modifier.height(11.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickAction("Buy number", "Virtual numbers", Icons.Rounded.PhoneAndroid, onBuy, Modifier.weight(1f))
-                QuickAction("Buy US number", "US options", Icons.Rounded.Search, { onService(ServicePage.UsNumbers) }, Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickAction("Rent number", "Longer access", Icons.Rounded.History, { onService(ServicePage.Rentals) }, Modifier.weight(1f))
-                QuickAction("Email OTP", "Email services", Icons.Rounded.CheckCircle, { onService(ServicePage.EmailOtp) }, Modifier.weight(1f))
-            }
-        }
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Services", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Browse available Nation Nums tools", color = Muted, fontSize = 12.sp)
+            item {
+                Column {
+                    Text("Quick access", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Choose a service. Each opens in its own dedicated page.", color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.height(11.dp))
+                    quickLinks.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { (title, subtitle, page) ->
+                                QuickAction(title, subtitle, when (page) {
+                                    ServicePage.VirtualNumbers, ServicePage.UsNumbers -> Icons.Rounded.PhoneAndroid
+                                    ServicePage.Rentals -> Icons.Rounded.History
+                                    ServicePage.EmailOtp -> Icons.Rounded.CheckCircle
+                                    ServicePage.Proxies -> Icons.Rounded.Shield
+                                    ServicePage.SocialMediaLogs -> Icons.Rounded.AccountCircle
+                                    else -> Icons.Rounded.Wallet
+                                }, { openingPage = page }, Modifier.weight(1f))
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ServiceRow("Buy virtual number", "Choose country, service and available option", Icons.Rounded.PhoneAndroid) { onService(ServicePage.VirtualNumbers) }
-                ServiceRow("Buy US number", "Compare available US number options", Icons.Rounded.Search) { onService(ServicePage.UsNumbers) }
-                ServiceRow("Rent a number", "Browse supported rental durations", Icons.Rounded.History) { onService(ServicePage.Rentals) }
-                ServiceRow("Email OTP", "Browse email verification services", Icons.Rounded.CheckCircle) { onService(ServicePage.EmailOtp) }
-                ServiceRow("Proxy services", "View available proxy options", Icons.Rounded.Shield) { onService(ServicePage.Proxies) }
-            }
         }
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onProfile)
-            ) {
-                Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(42.dp).background(PaleBlue, CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.AccountCircle, contentDescription = null, tint = NationBlue, modifier = Modifier.size(24.dp))
-                    }
-                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text("Account & settings", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Ink)
-                        Spacer(Modifier.height(3.dp))
-                        Text("Profile, security, notifications and support", color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
-                    }
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = "Open profile", tint = Muted)
+        if (openingPage != null) {
+            Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .96f)), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(painter = painterResource(id = R.drawable.ic_launcher_logo), contentDescription = "Nation Nums logo loading", modifier = Modifier.size(78.dp).graphicsLayer { rotationZ = rotation })
+                    Spacer(Modifier.height(15.dp))
+                    Text("Opening ${openingPage!!.title}…", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
         }

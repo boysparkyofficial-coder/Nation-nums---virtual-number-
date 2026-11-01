@@ -16,6 +16,8 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 - The app uses its bundled Nation Nums launcher artwork in the app's brand mark. The exact logo asset from the live website still needs verification.
 - Base44 email/password authentication code and encrypted Android Keystore session storage are present.
 - The Base44 entity HTTP client is intentionally read-only and requires the user's access token. The dashboard reads the latest available `balance_after` snapshot from the existing `WalletTransaction` ledger; it never invents a balance when no ledger snapshot is available. Wallet credits, purchases, and provider actions still require verified authenticated backend functions.
+- EasyNums is already registered in the existing Base44 provider registry as an enabled NGN supplier. Its API key remains server-side in Base44 Secrets; the Android app must never call EasyNums directly or contain supplier credentials. The native app must use the same Base44 catalogue, authenticated purchase functions, wallet ledger and order records as the website.
+- The Base44 registry reports EasyNums connected, but its 35 `virtual8` catalogue rows are Canada-only and were last refreshed on 2026-10-28. Refresh and verify the full live EasyNums country/service/stock/price catalogue through Base44 before treating the catalogue as current.
 - The API Documentation option opens the supplied developer reference externally: https://developer-nation-nums.base44.app/api-reference.
 - The native profile stays focused on core mobile needs; web-oriented API key management, team management and Telegram settings are intentionally not exposed as native screens.
 
@@ -23,6 +25,7 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 - Confirm Base44 email/password authentication, current-user validation via `/auth/me`, and session restoration against the live app.
 - Continue with Google native flow.
 - Live wallet, payment, catalog, purchases, orders, OTP messages, account notifications and push notifications must use the existing verified backend functions.
+- Review the official EasyNums Postman API contract and refresh its stale `virtual8` catalogue through the Base44 backend; do not add provider calls or credentials to the APK.
 - Exact live website logo and screen-by-screen visual parity still need verification.
 - Do not treat placeholder dashboard values as live account data.
 

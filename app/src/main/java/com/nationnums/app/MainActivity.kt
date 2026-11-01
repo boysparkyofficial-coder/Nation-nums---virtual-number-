@@ -1696,6 +1696,7 @@ private fun NotificationsScreen(
 
 @Composable
 private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: () -> Unit, onSetupLock: () -> Unit, lockConfigured: Boolean, biometricAvailable: Boolean) {
+    val context = LocalContext.current
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
@@ -1721,6 +1722,39 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                 else -> "This page is part of the native app structure. Live data and actions will be enabled after the existing Nation Nums backend is connected and tested."
             })
             Spacer(Modifier.height(18.dp))
+        }
+        if (page == ServicePage.Support) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(18.dp)) {
+                        Text("Email customer support", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(Modifier.height(7.dp))
+                        Text(
+                            "Contact the Nation Nums support team at nationnums@gmail.com. Your email app will open with the support address filled in.",
+                            color = Muted, fontSize = 13.sp, lineHeight = 19.sp
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val emailIntent = Intent(
+                                    Intent.ACTION_SENDTO,
+                                    Uri.parse("mailto:nationnums@gmail.com?subject=Nation%20Nums%20Support")
+                                )
+                                runCatching { context.startActivity(emailIntent) }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Email Nation Nums Support")
+                        }
+                    }
+                }
+            }
         }
         if (page == ServicePage.Security) {
             item {

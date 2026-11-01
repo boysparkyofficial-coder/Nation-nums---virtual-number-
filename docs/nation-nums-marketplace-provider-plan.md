@@ -31,6 +31,21 @@ Permanently removed:
 
 PipeSync was also named by the user as a provider they no longer need and must not be re-added unless the user explicitly changes this decision.
 
+## Current integration readiness
+
+- OTPWave: adapter is being wired; its API key must be entered in Base44 Secrets before its connection test can pass.
+- EasyNums: selected; adapter work is in progress and requires its API key in Base44 Secrets.
+- TempNumber.ng: selected; adapter work is in progress and requires its reseller API key in Base44 Secrets. Its catalogue must remain API-driven; do not impose a hardcoded country restriction.
+- AccNumbers: selected in the provider roster, but keep it disabled/awaiting API documentation and credentials until the official integration contract is available.
+- SMSvirtual.io: hold/disabled while undecided.
+- 5SIM.net and PipeSync: removed; do not re-add.
+- YoungPG Media: the only selected Social Media Logs supplier.
+- BillsJet: VTU candidate only; no purchases until account registration and API access are available.
+
+Provider API keys and other credentials must never be committed to this repository. Add them only through Base44's secure Secrets settings.
+
+The Android app now includes customer-facing entry points for Social Media Accounts and Virtual Top-Up. Those screens must use the same Nation Nums backend; they must not contain provider credentials or direct supplier API calls.
+
 ## Number rentals
 
 Use every selected SMS provider that actually supports rentals. Discover rental duration, country, service, inventory, renewal/extension, incoming-message retrieval, cancellation and refund capabilities from each provider's own API. Do not assume every SMS provider supports rentals.

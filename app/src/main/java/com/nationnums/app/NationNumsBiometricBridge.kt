@@ -18,10 +18,7 @@ internal class NationNumsBiometricBridge(
     @JavascriptInterface
     fun requestBiometricUnlock() {
         activity.runOnUiThread {
-            val current = runCatching { webView.url?.let(android.net.Uri::parse) }.getOrNull()
-            if (current?.scheme != "https" ||
-                !current.host.equals("nation-nums.base44.app", ignoreCase = true)
-            ) {
+            if (!isTrustedOrigin()) {
                 dispatchResult(false)
                 return@runOnUiThread
             }
@@ -33,11 +30,32 @@ internal class NationNumsBiometricBridge(
         }
     }
 
+    private fun isTrustedOrigin(): Boolean {
+        val current = runCatching { webView.url?.let(android.net.Uri::parse) }.getOrNull()
+        return current?.scheme == "https" &&
+            current.host.equals("nation-nums.base44.app", ignoreCase = true)
+    }
+
     @JavascriptInterface
-    fun isAvailable(): Boolean {
-        return androidx.biometric.BiometricManager.from(activity).canAuthenticate(
-            androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
-        ) == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+    fun isBiometricAvailable(): Boolean {
+        return isTrustedOrigin() &&
+            androidx.biometric.BiometricManager.from(activity).canAuthenticate(
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+            ) == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    // Backward-compatible alias for the first native implementation.
+    @JavascriptInterface
+    fun isAvailable(): Boolean = isBiometricAvailable()
+
+    /** Sync the website's authenticated biometric preference to the native foreground lock. */
+    @JavascriptInterface
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        activity.runOnUiThread {
+            if (isTrustedOrigin()) {
+                AppLockStore(activity).setBiometricEnabled(enabled)
+            }
+        }
     }
 
     private fun dispatchResult(success: Boolean) {

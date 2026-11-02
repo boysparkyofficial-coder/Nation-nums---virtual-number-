@@ -258,12 +258,21 @@ private fun NationNumsApp(activity: MainActivity) {
                 }
             }
         )
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+        val promptBuilder = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Nation Nums")
             .setSubtitle("Confirm it's you to open the app")
-            .setNegativeButtonText("Use app password")
-            .build()
-        prompt.authenticate(promptInfo)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ can securely fall back to the device's enrolled PIN,
+            // pattern or password. Older Android versions retain the app-passcode
+            // fallback shown by AppLockScreen.
+            promptBuilder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+        } else {
+            promptBuilder.setNegativeButtonText("Use app password")
+        }
+        prompt.authenticate(promptBuilder.build())
     }
 
     if (gateState != GateState.Dashboard) {

@@ -56,6 +56,21 @@ jobs:
       - name: Build debug Android App Bundle
         run: gradle bundleDebug
 
+      - name: Export debug signing certificate fingerprint for Android App Links
+        run: |
+          mkdir -p app/build/verification
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey > app/build/verification/debug-certificate.txt
+          grep "SHA256:" app/build/verification/debug-certificate.txt | head -1 | sed 's/.*SHA256: //' > app/build/verification/debug-sha256.txt
+          echo "Debug signing certificate SHA-256:"
+          cat app/build/verification/debug-sha256.txt
+
+      - name: Upload debug App Links fingerprint
+        uses: actions/upload-artifact@v6
+        with:
+          name: nation-nums-app-links-fingerprint
+          path: app/build/verification/debug-sha256.txt
+          if-no-files-found: error
+
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:

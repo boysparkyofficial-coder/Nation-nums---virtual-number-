@@ -72,6 +72,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.key
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -178,7 +179,10 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
     Profile("Profile", Icons.Rounded.AccountCircle)
 }
 
-private enum class ServicePage(val title: String, val subtitle: String) {
+internal enum class ServicePage(val title: String, val subtitle: String) {
+    AccountDetails("Account details", "Your verified Nation Nums profile"),
+    ProxyOrders("My proxies", "Delivered proxy credentials and usage"),
+    SocialOrders("Social account orders", "Your delivered account credentials"),
     VirtualNumbers("Buy virtual numbers", "Choose a country and service"),
     QrNumbers("Buy by QR number", "Browse supported QR-number options"),
     UsNumbers("Buy US numbers", "Browse supported US-number options"),
@@ -401,7 +405,11 @@ private fun NationNumsApp(activity: MainActivity) {
                 },
                 onVerifyOtp = { email, code, complete ->
                     authApi.verifyOtp(email, code) { result ->
-                        complete(if (result.success) null else result.error ?: "Email verification failed.")
+                        if (!result.success) complete(result.error ?: "Email verification failed.")
+                        else authApi.currentUser { current ->
+                            complete(if (current.success) null else current.error ?: "Please sign in to continue.")
+                            if (current.success) { signedInUser = current.user; checkingSession = false; showSignIn = false }
+                        }
                     }
                 },
                 onForgotPassword = { email, complete ->
@@ -454,9 +462,11 @@ private fun NationNumsApp(activity: MainActivity) {
                     pushStatus = pushStatus,
                     onRead = { id -> repository.readNotification(id) { result -> if (result.success) notificationsRefresh++ else notificationsError = result.error ?: "Could not update notification." } }
                 )
-            } else if (selectedPage == ServicePage.VirtualNumbers || selectedPage == ServicePage.UsNumbers) {
-                if (signedInUser == null) Button(onClick = { showSignIn = true }, modifier = Modifier.padding(padding)) { Text("Sign in to buy a number") }
-                else NativeNumberPurchase(backend, selectedPage == ServicePage.UsNumbers, Modifier.padding(padding), onBack = { selectedPage = null }, onPurchased = { selectedPage = null; selectedTab = AppTab.Orders; ordersRefresh++; walletRefresh++ })
+            } else if (selectedPage in setOf(ServicePage.VirtualNumbers, ServicePage.UsNumbers, ServicePage.Rentals, ServicePage.EmailOtp, ServicePage.Proxies, ServicePage.SocialMediaLogs, ServicePage.ProxyOrders, ServicePage.SocialOrders, ServicePage.Support, ServicePage.ApiKeys, ServicePage.Telegram, ServicePage.AccountDetails)) {
+                if (signedInUser == null) Button(onClick = { showSignIn = true }, modifier = Modifier.padding(padding)) { Text("Sign in to continue") }
+                else key(signedInUser!!.id, selectedPage) {
+                    NativeConnectedPage(selectedPage!!, backend, authApi, Modifier.padding(padding), onBack = { selectedPage = null }, onPurchased = { selectedPage = null; selectedTab = AppTab.Orders; ordersRefresh++; walletRefresh++ }, onPage = { selectedPage = it }, onAccountChanged = { ordersRefresh++; walletRefresh++; authApi.currentUser { result -> if (result.success) signedInUser = result.user } })
+                }
             } else if (selectedPage != null) {
                 ServiceDetailPage(
                     page = selectedPage!!,
@@ -514,7 +524,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         onSignIn = { showSignIn = true },
                         onRefresh = { ordersRefresh++ },
                         hasMore = ordersMore, onLoadMore = { loadOrders(true) },
-                        backend = backend, onAccountChanged = { ordersRefresh++; walletRefresh++ }
+                        backend = backend, onAccountChanged = { ordersRefresh++; walletRefresh++ }, onOpen = { selectedPage = it }
                     )
                     AppTab.Wallet -> WalletScreen(
                         modifier = Modifier.padding(padding),
@@ -1306,7 +1316,7 @@ private fun OrdersScreen(
     onSignIn: () -> Unit,
     onRefresh: () -> Unit,
     hasMore: Boolean, onLoadMore: () -> Unit,
-    backend: Base44Api, onAccountChanged: () -> Unit
+    backend: Base44Api, onAccountChanged: () -> Unit, onOpen: (ServicePage) -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     var filter by remember { mutableStateOf("All") }
@@ -1324,7 +1334,7 @@ private fun OrdersScreen(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) { PageHeader("Your orders", "Track numbers, activation status and received OTP messages.") }
+                Column(Modifier.weight(1f)) { PageHeader("Your orders", "Track numbers, activation status and received OTP messages."); if (isSignedIn) Row { TextButton(onClick = { onOpen(ServicePage.ProxyOrders) }) { Text("Proxy orders") }; TextButton(onClick = { onOpen(ServicePage.SocialOrders) }) { Text("Social accounts") } } }
                 OutlinedButton(onClick = onRefresh, enabled = isSignedIn && !isLoading, shape = RoundedCornerShape(10.dp)) { Text(if (isLoading) "Loading…" else "Refresh") }
             }
         }
@@ -1481,7 +1491,7 @@ private fun WalletScreen(
             }
         }
         item { Text("Funding methods", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold) }
-        if (isSignedIn) item { NativeCheckout(backend, onRefresh) }
+        if (isSignedIn) { item { NativeCheckout(backend, onRefresh) }; item { NativeBankTransfer(backend, onRefresh) } }
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -1576,6 +1586,7 @@ private fun ProfileScreen(
             Text("ACCOUNT", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
         }
+        item { ServiceRow("Account details", "Name, username and WhatsApp verification", Icons.Rounded.AccountCircle) { onOpen(ServicePage.AccountDetails) } }
         item { ServiceRow("Security", "Password, sessions and biometric options", Icons.Rounded.Shield) { onOpen(ServicePage.Security) } }
         item { ServiceRow("Notifications", "Order and wallet updates", Icons.Rounded.Notifications) { onOpen(ServicePage.Notifications) } }
         item {
@@ -1583,6 +1594,8 @@ private fun ProfileScreen(
             Text("TOOLS & SUPPORT", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
         }
+        item { ServiceRow("API key management", "Create, regenerate and revoke your keys", Icons.Rounded.Settings) { onOpen(ServicePage.ApiKeys) } }
+        item { ServiceRow("Telegram notifications", "Link your account and manage alerts", Icons.Rounded.Notifications) { onOpen(ServicePage.Telegram) } }
         item { ServiceRow("API Documentation", "Open the official documentation website", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Documentation) } }
         item { ServiceRow("Help & support", "Support tickets and contact options", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Support) } }
         item { ServiceRow("FAQs", "Common questions", Icons.Rounded.HelpOutline) { onOpen(ServicePage.Faq) } }
@@ -1703,10 +1716,11 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                 ServicePage.SocialMediaLogs -> "Only account listings actually supplied by YoungPG Media and legitimately transferable will be shown. Live catalogue, prices and purchase actions must be connected to the verified backend before use."
                 ServicePage.VirtualTopUp -> "The VTU marketplace is being prepared. BillsJet is still under consideration because registration is unavailable; do not accept payments until a provider API is selected and tested."
                 ServicePage.Notifications -> "Your real notifications will appear after account and push-notification integration is completed."
-                ServicePage.Security -> "Security settings will use the existing account system. Passwords and private keys will not be stored in plain text."
+                ServicePage.Security -> "Your account uses Nation Nums authentication. Password resets are available in Profile → Account details; the app passcode below protects this device only."
                 ServicePage.Support -> "Support ticket history and replies will load after the existing support endpoints are verified."
                 ServicePage.Team -> "Team members, invitations and permissions will be loaded from the existing Nation Nums account after team access is verified."
-                else -> "This page is part of the native app structure. Live data and actions will be enabled after the existing Nation Nums backend is connected and tested."
+                ServicePage.QrNumbers -> "QR-number purchases are not offered by the connected backend. Use Buy virtual numbers or Buy US numbers for currently supported services."
+                else -> "This option is not currently offered by the connected backend. No payment is accepted here."
             })
             Spacer(Modifier.height(18.dp))
         }
@@ -1758,22 +1772,6 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
                         Button(onClick = onSetupLock, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                             Text(if (lockConfigured) "Change app passcode" else "Set up app passcode")
                         }
-                    }
-                }
-            }
-        }
-        item {
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                Column(Modifier.padding(18.dp)) {
-                    Text("Next step", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        "The app-only password or biometric unlock protects this device. Live account access will be connected to the existing Base44 authentication flow.",
-                        color = Muted, fontSize = 13.sp, lineHeight = 19.sp
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                        Text("Sign in to continue")
                     }
                 }
             }

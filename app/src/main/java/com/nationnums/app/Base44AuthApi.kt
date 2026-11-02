@@ -273,7 +273,11 @@ internal class Base44AuthApi(
                         .orEmpty()
                 } catch (_: Exception) { "" }
                 if (status in 200..299) {
-                    ActionResult(true, status, serverMessage.ifBlank { "Request completed." })
+                    if (path == "/auth/verify-otp") {
+                        val token = JSONObject(raw).optString("access_token").trim().takeUnless { it.isBlank() || it == "null" }
+                        if (token == null) ActionResult(false, status, error = "Email verification returned no session. Please sign in.")
+                        else { sessionStore.saveToken(token, true); ActionResult(true, status, "Email verified.") }
+                    } else ActionResult(true, status, serverMessage.ifBlank { "Request completed." })
                 } else {
                     ActionResult(false, status, error = when (status) {
                         400, 422 -> serverMessage.ifBlank { "Check the details you entered and try again." }

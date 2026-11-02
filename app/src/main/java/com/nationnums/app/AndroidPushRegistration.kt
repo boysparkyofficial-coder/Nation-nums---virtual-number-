@@ -16,7 +16,7 @@ internal class AndroidPushRegistration(context: Context, private val sessions: B
     fun register(token: String, callback: (String) -> Unit = {}) {
         prefs.edit().putString(NationNumsFirebaseMessagingService.KEY_FCM_TOKEN, token).apply()
         if (sessions.readToken().isNullOrBlank()) return
-        api.invokeFunction("registerDeviceToken", JSONObject().put("action", "register").put("platform", "android").put("token", token).put("device_id", deviceId()).put("app_version", "1.0.24")) { result ->
+        api.invokeFunction("registerDeviceToken", JSONObject().put("action", "register").put("platform", "android").put("token", token).put("device_id", deviceId()).put("app_version", "1.0.25")) { result ->
             callback(if (!result.success) result.error ?: "Device registration failed." else if (JSONObject(result.body).optBoolean("delivery_configured")) "This device is linked for mobile notifications." else "This device is linked. Push sending is waiting for valid server credentials.")
         }
     }

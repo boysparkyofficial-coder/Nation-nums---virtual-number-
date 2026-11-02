@@ -41,3 +41,9 @@ Connected core: server-calculated wallet balance and paginated ledger; session-s
 Deploy/publish the Base44 changes containing mobileAccount and the updated purchase/payment functions before distributing this APK. CI runs unit tests and produces the rebuilt APK; customer transactions and real push delivery still require device acceptance testing.
 
 Remaining native flows: rental checkout, proxies, email OTP, social marketplace, NationFlow virtual-account setup, support tickets, provider-aware cancellation, and Google sign-in. QR numbers and VTU have no verified backend purchase contract and remain unavailable. Mobile push sending remains disabled until a valid rotated Firebase server service-account credential is supplied securely to the backend; google-services.json is not that credential.
+
+
+## Connected customer backend — 1.0.25
+Native screens use the existing Nation Nums customer session and backend for SMS/US numbers, rental catalogues/prices, Email OTP, proxy quotes/purchases/usage and credentials, social account purchases/delivery history, cancellation/refunds, wallet checkout/bank transfers, support tickets/replies, API keys, Telegram linking, profile updates and WhatsApp verification. Purchases and wallet mutations stay server-side with existing pricing and profit rules unchanged.
+
+Admin/provider credentials and admin-only operations are never embedded in the APK. QR-number purchases, VTU, rental extension and team management have no supported customer backend implementation. Android push registration is connected; sending requires valid server-side Firebase credentials. Install this commit's successfully built APK to receive the native changes.

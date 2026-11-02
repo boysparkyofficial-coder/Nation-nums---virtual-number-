@@ -134,6 +134,6 @@ internal class Base44Api(
         const val APP_ID = "6ac1b21923bd8a65822f7956"
         const val CONNECT_TIMEOUT_MS = 12_000
         const val READ_TIMEOUT_MS = 90_000
-        val FUNCTIONS = setOf("mobileAccount", "getSmsCatalog", "getSmsOffers", "getPurchasePrice", "provisionNumber", "fetchInbox", "registerDeviceToken", "createCheckoutPayment", "verifyCheckoutPayment")
+        val FUNCTIONS = setOf("mobileAccount", "mobileSupport", "getSmsCatalog", "getSmsOffers", "getPurchasePrice", "listEligibleServers", "provisionNumber", "cancelNumber", "fetchInbox", "registerDeviceToken", "createCheckoutPayment", "verifyCheckoutPayment", "createDepositAccount", "getEmailOtpCatalog", "getProxyCatalog", "getProxyQuote", "provisionProxy", "getProxyOrder", "getSocialLogsCatalog", "provisionSocialLog", "sendSocialLogOrderWhatsApp", "manageApiKeys", "manageTelegramLink", "updateUsername", "verifyPhone")
     }
 }

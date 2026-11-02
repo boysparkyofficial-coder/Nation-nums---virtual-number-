@@ -278,6 +278,14 @@ private fun NationNumsApp(activity: MainActivity) {
         prompt.authenticate(promptBuilder.build())
     }
 
+    // Offer biometric unlock automatically whenever the configured app lock is shown.
+    // The passcode keypad remains available if the user cancels or biometric fails.
+    LaunchedEffect(gateState, biometricAvailable, lockStore.isBiometricEnabled()) {
+        if (gateState == GateState.Locked && biometricAvailable && lockStore.isBiometricEnabled()) {
+            promptBiometric()
+        }
+    }
+
     if (gateState != GateState.Dashboard) {
         AppLockScreen(
             isSetup = gateState == GateState.Setup,

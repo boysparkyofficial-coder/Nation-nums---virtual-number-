@@ -94,8 +94,12 @@ jobs:
       - name: Build debug Android App Bundle
         run: gradle bundleDebug --no-build-cache
 
-      # Gradle's signDebugBundle task already signs the AAB with the configured
-      # persistent debug keystore. Do not re-sign an already signed bundle.
+      # Sign the AAB explicitly; the current Gradle debug bundle output is unsigned.
+      - name: Sign debug App Bundle with the persistent Nation Nums key
+        run: |
+          set -euo pipefail
+          jarsigner -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -digestalg SHA-256 -sigalg SHA256withRSA app/build/outputs/bundle/debug/app-debug.aab androiddebugkey
+          jarsigner -verify -certs app/build/outputs/bundle/debug/app-debug.aab
 
       - name: Verify the approved Nation Nums signing key
         run: |

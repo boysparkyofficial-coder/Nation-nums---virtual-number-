@@ -61,6 +61,7 @@ internal fun NationWebsiteScreen(
     var canGoBack by remember { mutableStateOf(false) }
     var lastSessionToken by remember { mutableStateOf(sessionStore.readToken().orEmpty()) }
     val pushRegistration = remember { AndroidPushRegistration(activity, sessionStore) }
+    var biometricBridge by remember { mutableStateOf<NationNumsBiometricBridge?>(null) }
 
     var pendingFileCallback by remember { mutableStateOf<android.webkit.ValueCallback<Array<Uri>>?>(null) }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -132,6 +133,10 @@ internal fun NationWebsiteScreen(
         onDispose {
             pendingFileCallback?.onReceiveValue(null)
             pendingFileCallback = null
+            webView?.removeJavascriptInterface("NationNumsNative")
+            webView?.removeJavascriptInterface("NativeApp")
+            webView?.removeJavascriptInterface("Android")
+            biometricBridge = null
             webView?.stopLoading()
             webView?.destroy()
             webView = null
@@ -144,6 +149,12 @@ internal fun NationWebsiteScreen(
             factory = { context ->
                 WebView(context).apply {
                     webView = this
+                    NationNumsBiometricBridge(activity, this).also { bridge ->
+                        biometricBridge = bridge
+                        addJavascriptInterface(bridge, "NationNumsNative")
+                        addJavascriptInterface(bridge, "NativeApp")
+                        addJavascriptInterface(bridge, "Android")
+                    }
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.databaseEnabled = true

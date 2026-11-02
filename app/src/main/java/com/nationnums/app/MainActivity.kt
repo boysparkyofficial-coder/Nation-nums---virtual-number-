@@ -272,7 +272,7 @@ private fun NationNumsApp(activity: MainActivity) {
     val sessionStore = remember { Base44SessionStore(activity) }
     var gateState by remember {
         mutableStateOf(
-            if (lockStore.isConfigured() && !sessionStore.readToken().isNullOrBlank())
+            if (lockStore.isLockEnabled() && !sessionStore.readToken().isNullOrBlank())
                 GateState.Locked else GateState.Dashboard
         )
     }
@@ -287,7 +287,7 @@ private fun NationNumsApp(activity: MainActivity) {
     LaunchedEffect(activity.shouldLockOnResume) {
         if (activity.shouldLockOnResume) {
             if (gateState == GateState.Dashboard &&
-                lockStore.isConfigured() && !sessionStore.readToken().isNullOrBlank()
+                lockStore.isLockEnabled() && !sessionStore.readToken().isNullOrBlank()
             ) {
                 gateState = GateState.Locked
                 gateError = ""
@@ -301,7 +301,7 @@ private fun NationNumsApp(activity: MainActivity) {
         while (gateState == GateState.Dashboard) {
             kotlinx.coroutines.delay(1000)
             val inactiveFor = android.os.SystemClock.elapsedRealtime() - activity.lastInteractionTime()
-            if (lockStore.isConfigured() && inactiveFor >= 15 * 60 * 1000L) {
+            if (lockStore.isLockEnabled() && inactiveFor >= 15 * 60 * 1000L) {
                 gateError = ""
                 gateState = GateState.Locked
                 break

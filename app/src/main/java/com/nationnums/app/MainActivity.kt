@@ -130,6 +130,14 @@ class MainActivity : FragmentActivity() {
     var shouldLockOnResume by mutableStateOf(false)
         private set
 
+    var notificationDestination by mutableStateOf<String?>(null)
+        private set
+    fun consumeNotification() { notificationDestination = null }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        notificationDestination = intent.getStringExtra("notification_destination")
+    }
     fun clearRelockFlag() { shouldLockOnResume = false }
 
     override fun onStop() {
@@ -139,6 +147,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        notificationDestination = intent?.getStringExtra("notification_destination")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -317,74 +326,55 @@ private fun NationNumsApp(activity: MainActivity) {
         var smsMessages by remember { mutableStateOf<List<SmsMessageRecord>>(emptyList()) }
         var ordersLoading by remember { mutableStateOf(false) }
         var ordersError by remember { mutableStateOf("") }
-        val repository = remember { NationNumsRepository { sessionStore.readToken() } }
+        val repository = remember(signedInUser?.id) { NationNumsRepository { sessionStore.readToken() } }
+        val backend = remember { Base44Api { sessionStore.readToken() } }
+        val pushRegistration = remember { AndroidPushRegistration(activity, sessionStore) }
+        var pushStatus by remember { mutableStateOf("") }
+        var walletMore by remember { mutableStateOf(false) }
+        var numbersMore by remember { mutableStateOf(false) }
+        var ordersMore by remember { mutableStateOf(false) }
+        var notificationsMore by remember { mutableStateOf(false) }
 
+        fun loadWallet(more: Boolean = false) {
+            val owner = signedInUser?.id ?: return
+            walletLoading = true; walletError = ""
+            repository.loadWalletTransactions(more) { result, records ->
+                if (signedInUser?.id == owner) { walletLoading = false; walletTransactions = records; walletBalance = if (result.success) repository.walletBalance else null; walletMore = repository.hasMore("wallet"); walletError = if (result.success) "" else result.error ?: "Could not load your wallet." }
+            }
+        }
+        fun loadNumbers(more: Boolean = false) {
+            val owner = signedInUser?.id ?: return
+            numbersLoading = true; numbersError = ""
+            repository.loadVirtualNumbers(more) { result, records ->
+                if (signedInUser?.id == owner) { numbersLoading = false; virtualNumbers = records; numbersMore = repository.hasMore("numbers"); numbersError = if (result.success) "" else result.error ?: "Could not load your numbers." }
+            }
+        }
+        fun loadNotifications(more: Boolean = false) {
+            val owner = signedInUser?.id ?: return
+            notificationsLoading = true; notificationsError = ""
+            repository.loadNotifications(more) { result, records ->
+                if (signedInUser?.id == owner) { notificationsLoading = false; notifications = records; notificationsMore = repository.hasMore("notifications"); notificationsError = if (result.success) "" else result.error ?: "Could not load notifications." }
+            }
+        }
+        fun loadOrders(more: Boolean = false) {
+            val owner = signedInUser?.id ?: return
+            ordersLoading = true; ordersError = ""
+            var remaining = 2
+            fun finish() { remaining--; if (remaining == 0) { ordersLoading = false; ordersMore = repository.hasMore("numbers") || repository.hasMore("messages") } }
+            repository.loadVirtualNumbers(more) { result, records -> if (signedInUser?.id == owner) { virtualNumbers = records; if (!result.success) ordersError = result.error ?: "Could not load your orders."; finish() } }
+            repository.loadSmsMessages(more) { result, records -> if (signedInUser?.id == owner) { smsMessages = records; if (!result.success) ordersError = result.error ?: "Could not load SMS."; finish() } }
+        }
+        LaunchedEffect(signedInUser?.id) { if (signedInUser != null) pushRegistration.sync { pushStatus = it } }
+        LaunchedEffect(activity.notificationDestination, signedInUser?.id) {
+            if (signedInUser != null && activity.notificationDestination != null) {
+                when (activity.notificationDestination) { "wallet" -> { selectedPage = null; selectedTab = AppTab.Wallet }; "orders" -> { selectedPage = null; selectedTab = AppTab.Orders }; else -> selectedPage = ServicePage.Notifications }
+                activity.consumeNotification()
+            }
+        }
         LaunchedEffect(signedInUser?.id, selectedTab, selectedPage, notificationsRefresh, numbersRefresh, ordersRefresh, walletRefresh) {
-            if (signedInUser != null && selectedPage == ServicePage.Notifications) {
-                notificationsLoading = true
-                notificationsError = ""
-                repository.loadNotifications { result, records ->
-                    notificationsLoading = false
-                    notifications = records
-                    notificationsError = if (result.success) "" else result.error ?: "Could not load notifications."
-                }
-            }
-            if (selectedTab == AppTab.Numbers) {
-                catalogLoading = true
-                catalogError = ""
-                repository.loadServiceCatalog { result, records ->
-                    catalogLoading = false
-                    serviceCatalog = records
-                    catalogError = if (result.success) "" else result.error ?: "Could not load the live service catalogue."
-                }
-            }
-            if (signedInUser != null && selectedTab == AppTab.Numbers) {
-                numbersLoading = true
-                numbersError = ""
-                repository.loadVirtualNumbers { result, records ->
-                    numbersLoading = false
-                    virtualNumbers = records
-                    numbersError = if (result.success) "" else result.error ?: "Could not load your numbers."
-                }
-            }
-            if (signedInUser != null && (selectedTab == AppTab.Home || selectedTab == AppTab.Wallet)) {
-                walletLoading = true
-                walletError = ""
-                repository.loadWalletTransactions { result, records ->
-                    walletLoading = false
-                    walletTransactions = records
-                    walletBalance = if (result.success) latestWalletBalance(records) else null
-                    walletError = if (result.success) "" else result.error ?: "Could not load transactions."
-                }
-            }
-            if (signedInUser != null && selectedTab == AppTab.Orders) {
-                ordersLoading = true
-                ordersError = ""
-                var numberResult: Base44Api.Result? = null
-                var smsResult: Base44Api.Result? = null
-                var loadedNumbers: List<VirtualNumberRecord> = emptyList()
-                var loadedMessages: List<SmsMessageRecord> = emptyList()
-                fun finishIfReady() {
-                    if (numberResult != null && smsResult != null) {
-                        ordersLoading = false
-                        virtualNumbers = loadedNumbers
-                        smsMessages = loadedMessages
-                        ordersError = listOfNotNull(
-                            numberResult?.takeIf { !it.success }?.error,
-                            smsResult?.takeIf { !it.success }?.error
-                        ).firstOrNull().orEmpty()
-                    }
-                }
-                repository.loadVirtualNumbers { result, records ->
-                    numberResult = result
-                    loadedNumbers = records
-                    finishIfReady()
-                }
-                repository.loadSmsMessages { result, records ->
-                    smsResult = result
-                    loadedMessages = records
-                    finishIfReady()
-                }
+            if (signedInUser != null) {
+                if (selectedPage == ServicePage.Notifications) loadNotifications()
+                else when (selectedTab) { AppTab.Home, AppTab.Wallet -> loadWallet(); AppTab.Numbers -> loadNumbers(); AppTab.Orders -> loadOrders(); else -> Unit }
             }
         }
 
@@ -458,8 +448,14 @@ private fun NationNumsApp(activity: MainActivity) {
                     isSignedIn = signedInUser != null,
                     onBack = { selectedPage = null },
                     onSignIn = { showSignIn = true },
-                    onRefresh = { notificationsRefresh++ }
+                    onRefresh = { notificationsRefresh++ },
+                    hasMore = notificationsMore, onLoadMore = { loadNotifications(true) },
+                    pushStatus = pushStatus,
+                    onRead = { id -> repository.readNotification(id) { result -> if (result.success) notificationsRefresh++ else notificationsError = result.error ?: "Could not update notification." } }
                 )
+            } else if (selectedPage == ServicePage.VirtualNumbers || selectedPage == ServicePage.UsNumbers) {
+                if (signedInUser == null) Button(onClick = { showSignIn = true }, modifier = Modifier.padding(padding)) { Text("Sign in to buy a number") }
+                else NativeNumberPurchase(backend, selectedPage == ServicePage.UsNumbers, Modifier.padding(padding), onBack = { selectedPage = null }, onPurchased = { selectedPage = null; selectedTab = AppTab.Orders; ordersRefresh++; walletRefresh++ })
             } else if (selectedPage != null) {
                 ServiceDetailPage(
                     page = selectedPage!!,
@@ -504,6 +500,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         isSignedIn = signedInUser != null,
                         onSignIn = { showSignIn = true },
                         onRefresh = { numbersRefresh++ },
+                        hasMore = numbersMore, onLoadMore = { loadNumbers(true) },
                         onOpen = { selectedPage = it }
                     )
                     AppTab.Orders -> OrdersScreen(
@@ -514,7 +511,9 @@ private fun NationNumsApp(activity: MainActivity) {
                         errorMessage = ordersError,
                         isSignedIn = signedInUser != null,
                         onSignIn = { showSignIn = true },
-                        onRefresh = { ordersRefresh++ }
+                        onRefresh = { ordersRefresh++ },
+                        hasMore = ordersMore, onLoadMore = { loadOrders(true) },
+                        backend = backend, onAccountChanged = { ordersRefresh++; walletRefresh++ }
                     )
                     AppTab.Wallet -> WalletScreen(
                         modifier = Modifier.padding(padding),
@@ -524,7 +523,8 @@ private fun NationNumsApp(activity: MainActivity) {
                         errorMessage = walletError,
                         isSignedIn = signedInUser != null,
                         onSignIn = { showSignIn = true },
-                        onRefresh = { walletRefresh++ }
+                        onRefresh = { walletRefresh++ },
+                        hasMore = walletMore, onLoadMore = { loadWallet(true) }, backend = backend
                     )
                     AppTab.Profile -> ProfileScreen(
                         modifier = Modifier.padding(padding),
@@ -537,6 +537,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         },
                         onSignIn = { showSignIn = true },
                         onSignOut = {
+                            pushRegistration.unlink {
                             authApi.logout()
                             signedInUser = null
                             walletTransactions = emptyList()
@@ -544,7 +545,9 @@ private fun NationNumsApp(activity: MainActivity) {
                             virtualNumbers = emptyList()
                             smsMessages = emptyList()
                             notifications = emptyList()
+                            pushStatus = ""
                             showSignIn = true
+                            }
                         }
                     )
                 }
@@ -1163,7 +1166,8 @@ private fun ServicesScreen(
     isSignedIn: Boolean,
     onSignIn: () -> Unit,
     onOpen: (ServicePage) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    hasMore: Boolean, onLoadMore: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     var query by remember { mutableStateOf("") }
@@ -1286,41 +1290,7 @@ private fun ServicesScreen(
                 Spacer(Modifier.height(12.dp))
             }
         }
-        item {
-            Text("LIVE CATALOGUE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
-        }
-        if (catalogLoading) {
-            item { Text("Loading live services from Nation Nums…", color = Muted, fontSize = 13.sp) }
-        } else if (catalogError.isNotBlank()) {
-            item { InfoNotice(catalogError) }
-        } else if (serviceCatalog.isEmpty()) {
-            item { Text("No active catalogue entries were returned by the Nation Nums backend.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp) }
-        } else {
-            items(serviceCatalog, key = { "catalog-" + it.id }) { entry ->
-                val rawPrice = if (entry.listedAs.equals("rental", true)) entry.priceRental else entry.priceTemporary
-                Card(
-                    shape = RoundedCornerShape(15.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.flag.ifBlank { "🌐" }, fontSize = 23.sp)
-                        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                            Text(entry.service.ifBlank { "Virtual number" }, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text(listOf(entry.country, entry.carrier).filter { it.isNotBlank() }.joinToString(" · "), color = Muted, fontSize = 11.sp)
-                            Text(if (entry.listedAs.equals("rental", true)) "Rental" else "Temporary", color = Muted, fontSize = 10.sp)
-                        }
-                        Text(if (rawPrice.isNotBlank()) formatNairaAmount(rawPrice) else "Price unavailable", color = NationBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-        item {
-            Spacer(Modifier.height(8.dp))
-            InfoNotice("Prices and availability are read from the existing Nation Nums Base44 catalogue. Buying and renting remain disabled until the website's authenticated purchase functions are verified.")
-        }
+        if (hasMore) item { OutlinedButton(onClick = onLoadMore, enabled = !numbersLoading, modifier = Modifier.fillMaxWidth()) { Text("Load more numbers") } }
     }
 }
 
@@ -1333,7 +1303,9 @@ private fun OrdersScreen(
     errorMessage: String,
     isSignedIn: Boolean,
     onSignIn: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    hasMore: Boolean, onLoadMore: () -> Unit,
+    backend: Base44Api, onAccountChanged: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     var filter by remember { mutableStateOf("All") }
@@ -1418,6 +1390,7 @@ private fun OrdersScreen(
                                     Text("Copy number", fontSize = 11.sp)
                                 }
                             }
+                            NativeNumberActions(backend, number, onAccountChanged)
                             if (number.expiresAt.isNotBlank()) {
                                 Spacer(Modifier.height(7.dp))
                                 Text("Expires: " + number.expiresAt, color = Muted, fontSize = 11.sp)
@@ -1466,7 +1439,7 @@ private fun OrdersScreen(
                 }
             }
         }
-        item { InfoNotice("This page is read-only. Number purchases, rentals, OTP requests and cancellations must be completed through verified Nation Nums backend operations.") }
+        if (hasMore) item { OutlinedButton(onClick = onLoadMore, enabled = !isLoading, modifier = Modifier.fillMaxWidth()) { Text("Load more orders and SMS") } }
     }
 }
 
@@ -1479,7 +1452,8 @@ private fun WalletScreen(
     errorMessage: String,
     isSignedIn: Boolean,
     onSignIn: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    hasMore: Boolean, onLoadMore: () -> Unit, backend: Base44Api
 ) {
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
         item { PageHeader("Wallet", "Manage your balance and funding activity.") }
@@ -1506,8 +1480,7 @@ private fun WalletScreen(
             }
         }
         item { Text("Funding methods", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold) }
-        item { ServiceRow("Nation Flow", "Virtual account funding · connection pending", Icons.Rounded.Wallet) { } }
-        item { ServiceRow("NationCheckout", "Online payment · connection pending", Icons.Rounded.Add) { } }
+        if (isSignedIn) item { NativeCheckout(backend, onRefresh) }
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 Text("Recent transactions", fontSize = 18.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -1522,7 +1495,7 @@ private fun WalletScreen(
         } else if (errorMessage.isNotBlank()) {
             item { InfoNotice(errorMessage) }
         } else if (transactions.isEmpty()) {
-            item { EmptyState(icon = Icons.Rounded.History, title = "No transactions found", body = "Transactions will appear here after they are recorded by the Nation Nums backend.", action = "Refresh later", onAction = {}) }
+            item { EmptyState(icon = Icons.Rounded.History, title = "No transactions found", body = "Transactions will appear here after they are recorded by the Nation Nums backend.", action = "Refresh", onAction = onRefresh) }
         } else {
             items(transactions) { transaction ->
                 Card(shape = RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
@@ -1537,7 +1510,7 @@ private fun WalletScreen(
                 }
             }
         }
-        item { InfoNotice("Payments are not initiated from this screen. Wallet credits must be confirmed by the existing backend; the app never writes wallet transactions directly.") }
+        if (hasMore) item { OutlinedButton(onClick = onLoadMore, enabled = !isLoading, modifier = Modifier.fillMaxWidth()) { Text("Load more transactions") } }
     }
 }
 @Composable
@@ -1625,7 +1598,9 @@ private fun NotificationsScreen(
     isSignedIn: Boolean,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    hasMore: Boolean, onLoadMore: () -> Unit,
+    pushStatus: String, onRead: (String) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -1644,6 +1619,7 @@ private fun NotificationsScreen(
                 }
             }
             PageHeader("Notifications", "Updates recorded for your Nation Nums account.")
+            if (pushStatus.isNotBlank()) Text(pushStatus, style = MaterialTheme.typography.bodySmall)
         }
         if (!isSignedIn) {
             item {
@@ -1683,6 +1659,7 @@ private fun NotificationsScreen(
                         }
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(notice.title, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            if (!notice.isRead) TextButton(onClick = { onRead(notice.id) }) { Text("Mark as read") }
                             if (notice.body.isNotBlank()) {
                                 Spacer(Modifier.height(4.dp))
                                 Text(notice.body, color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
@@ -1699,7 +1676,7 @@ private fun NotificationsScreen(
                 }
             }
         }
-        item { InfoNotice("This screen is read-only. Mark-as-read actions will be added only through a verified backend operation.") }
+        if (hasMore) item { OutlinedButton(onClick = onLoadMore, enabled = !isLoading, modifier = Modifier.fillMaxWidth()) { Text("Load more notifications") } }
     }
 }
 

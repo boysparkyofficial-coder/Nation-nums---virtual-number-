@@ -31,3 +31,13 @@ Native Android application for Nation Nums, built with Kotlin and Jetpack Compos
 
 ## Backend rules
 The app must use the existing Nation Nums Base44 backend as the source of truth. Do not add a second database, Supabase, Cloudflare backend, or payment-provider secret keys to the APK. Verify the actual website/Base44 authentication and function contracts before connecting account actions.
+
+## Native backend connection — 1.0.24
+
+The Android client now calls the same authenticated Base44 function transport as the website, using each customer's encrypted session token. No supplier key or service credential is bundled.
+
+Connected core: server-calculated wallet balance and paginated ledger; session-scoped numbers, SMS and notifications; live SMS/US country/service/offer selection; price confirmation and wallet-backed purchases; per-number SMS synchronization; notification read state; hosted NationCheckout initiation and server-side payment verification; Android device registration, refresh, unlink and notification routing.
+
+Deploy/publish the Base44 changes containing mobileAccount and the updated purchase/payment functions before distributing this APK. CI runs unit tests and produces the rebuilt APK; customer transactions and real push delivery still require device acceptance testing.
+
+Remaining native flows: rental checkout, proxies, email OTP, social marketplace, NationFlow virtual-account setup, support tickets, provider-aware cancellation, and Google sign-in. QR numbers and VTU have no verified backend purchase contract and remain unavailable. Mobile push sending remains disabled until a valid rotated Firebase server service-account credential is supplied securely to the backend; google-services.json is not that credential.

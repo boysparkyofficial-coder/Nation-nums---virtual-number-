@@ -24,8 +24,7 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
             .edit()
             .putString(KEY_FCM_TOKEN, token)
             .apply()
-        // TODO: sync token to the authenticated Nation Nums backend endpoint.
-        // Do not send it to a guessed route or expose backend credentials in the APK.
+        AndroidPushRegistration(applicationContext, Base44SessionStore(applicationContext)).register(token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -56,10 +55,11 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
             ?: Intent(this, MainActivity::class.java)
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        data["type"]?.let { launchIntent.putExtra("notification_type", it) }
+        launchIntent.putExtra("notification_destination", NativeNotificationRoutes.destination(data["url"], data["type"]))
+        val requestCode = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
         val pendingIntent = PendingIntent.getActivity(
             this,
-            NOTIFICATION_ID,
+            requestCode,
             launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -74,6 +74,8 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
             .setContentIntent(pendingIntent)
             .build()
 
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return
+        if (Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         NotificationManagerCompat.from(this).notify(
             (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
             notification

@@ -151,38 +151,39 @@ internal object Base44RecordParser {
  */
 internal class NationNumsRepository(accessToken: () -> String?) {
     private val api = Base44Api(accessToken)
+    private val cursors = mutableMapOf<String, String?>()
+    private val cache = mutableMapOf<String, List<JSONObject>>()
+    var walletBalance: String? = null
+        private set
+    fun hasMore(section: String) = cursors[section] != null
 
-    fun loadWalletTransactions(callback: (Base44Api.Result, List<WalletTransactionRecord>) -> Unit) {
-        api.getEntityRecords("WalletTransaction") { result ->
-            callback(result, if (result.success) Base44RecordParser.records(result.body).map(Base44RecordParser::walletTransaction) else emptyList())
+    private fun page(section: String, more: Boolean, callback: (Base44Api.Result, List<JSONObject>) -> Unit) {
+        val cursor = cursors[section]
+        if (more && cursor == null) {
+            callback(Base44Api.Result(true, 200, "{}"), cache[section].orEmpty())
+            return
+        }
+        val payload = JSONObject().put("section", section)
+        if (more) payload.put("cursor", cursor)
+        api.invokeFunction("mobileAccount", payload) { result ->
+            if (result.success) {
+                val root = JSONObject(result.body)
+                val items = Base44RecordParser.records(result.body)
+                cache[section] = (if (more) cache[section].orEmpty() + items else items).distinctBy { it.optString("id") }
+                cursors[section] = root.optString("next_cursor").takeIf { root.optBoolean("has_more") && it.isNotBlank() && it != "null" }
+                if (section == "wallet") walletBalance = root.optString("balance").takeUnless { it.isBlank() || it == "null" }
+            }
+            callback(result, cache[section].orEmpty())
         }
     }
-
-    fun loadServiceCatalog(callback: (Base44Api.Result, List<ServiceCatalogRecord>) -> Unit) {
-        api.getEntityRecords("ServiceCatalog", requireAuth = false) { result ->
-            val records = if (result.success) Base44RecordParser.records(result.body)
-                .map(Base44RecordParser::serviceCatalog)
-                .filter { it.available && it.status.equals("active", ignoreCase = true) }
-            else emptyList()
-            callback(result, records)
-        }
-    }
-
-    fun loadVirtualNumbers(callback: (Base44Api.Result, List<VirtualNumberRecord>) -> Unit) {
-        api.getEntityRecords("VirtualNumber") { result ->
-            callback(result, if (result.success) Base44RecordParser.records(result.body).map(Base44RecordParser::virtualNumber) else emptyList())
-        }
-    }
-
-    fun loadNotifications(callback: (Base44Api.Result, List<NotificationRecord>) -> Unit) {
-        api.getEntityRecords("Notification") { result ->
-            callback(result, if (result.success) Base44RecordParser.records(result.body).map(Base44RecordParser::notification) else emptyList())
-        }
-    }
-
-    fun loadSmsMessages(callback: (Base44Api.Result, List<SmsMessageRecord>) -> Unit) {
-        api.getEntityRecords("SmsMessage") { result ->
-            callback(result, if (result.success) Base44RecordParser.records(result.body).map(Base44RecordParser::smsMessage) else emptyList())
-        }
-    }
+    fun loadWalletTransactions(more: Boolean = false, callback: (Base44Api.Result, List<WalletTransactionRecord>) -> Unit) =
+        page("wallet", more) { result, rows -> callback(result, rows.map(Base44RecordParser::walletTransaction)) }
+    fun loadVirtualNumbers(more: Boolean = false, callback: (Base44Api.Result, List<VirtualNumberRecord>) -> Unit) =
+        page("numbers", more) { result, rows -> callback(result, rows.map(Base44RecordParser::virtualNumber)) }
+    fun loadNotifications(more: Boolean = false, callback: (Base44Api.Result, List<NotificationRecord>) -> Unit) =
+        page("notifications", more) { result, rows -> callback(result, rows.map(Base44RecordParser::notification)) }
+    fun loadSmsMessages(more: Boolean = false, callback: (Base44Api.Result, List<SmsMessageRecord>) -> Unit) =
+        page("messages", more) { result, rows -> callback(result, rows.map(Base44RecordParser::smsMessage)) }
+    fun readNotification(id: String, callback: (Base44Api.Result) -> Unit) =
+        api.invokeFunction("mobileAccount", JSONObject().put("section", "notifications").put("read_id", id), callback)
 }

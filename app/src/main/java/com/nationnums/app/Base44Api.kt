@@ -8,9 +8,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.Executors
+import org.json.JSONObject
 
 /**
- * Read-only HTTP client for the existing Nation Nums Base44 app.
+ * User-authenticated HTTP client for the existing Nation Nums Base44 app.
  *
  * It contains no provider credentials and cannot create or modify entity records.
  * Wallet credits, number purchases, and provider actions must use verified,
@@ -48,7 +49,15 @@ internal class Base44Api(
      * Only GET requests to a validated entity collection are allowed here.
      * This intentionally prevents the client from mutating wallet or order data.
      */
-    private fun requestEntityRecords(path: String, requireAuth: Boolean, callback: (Result) -> Unit) {
+    fun invokeFunction(name: String, payload: JSONObject = JSONObject(), callback: (Result) -> Unit) {
+        require(name in FUNCTIONS) { "Unsupported Nation Nums operation." }
+        request("/functions/" + name, "POST", payload.toString(), true, callback)
+    }
+
+    private fun requestEntityRecords(path: String, requireAuth: Boolean, callback: (Result) -> Unit) =
+        request(path, "GET", null, requireAuth, callback)
+
+    private fun request(path: String, method: String, payload: String?, requireAuth: Boolean, callback: (Result) -> Unit) {
         val token = accessToken()?.trim().orEmpty()
         if (requireAuth && token.isBlank()) {
             mainHandler.post {
@@ -61,12 +70,18 @@ internal class Base44Api(
             var connection: HttpURLConnection? = null
             val result = try {
                 connection = URL(BASE_URL + path).openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
+                connection.requestMethod = method
+                connection.instanceFollowRedirects = false
                 connection.connectTimeout = CONNECT_TIMEOUT_MS
                 connection.readTimeout = READ_TIMEOUT_MS
                 connection.setRequestProperty("X-App-Id", APP_ID)
                 if (token.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
                 connection.setRequestProperty("Accept", "application/json")
+                if (payload != null) {
+                    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    connection.doOutput = true
+                    connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+                }
 
                 val status = connection.responseCode
                 val stream = if (status in 200..299) connection.inputStream else connection.errorStream
@@ -77,7 +92,7 @@ internal class Base44Api(
                     status in 200..299,
                     status,
                     body,
-                    if (status in 200..299) null else safeError(status)
+                    if (status in 200..299) null else responseError(body, status)
                 )
             } catch (e: Exception) {
                 Result(false, 0, "", "Backend connection failed (${e.javaClass.simpleName}). Check your internet connection and try again.")
@@ -87,6 +102,15 @@ internal class Base44Api(
             mainHandler.post { callback(result) }
         }
     }
+
+    private fun responseError(body: String, status: Int): String = runCatching {
+        val value = JSONObject(body).opt("error")
+        when (value) {
+            is String -> value.takeIf { it.isNotBlank() }
+            is JSONObject -> value.optString("message").takeIf { it.isNotBlank() }
+            else -> null
+        }
+    }.getOrNull()?.take(500) ?: safeError(status)
 
     private fun safeError(status: Int): String = when (status) {
         401, 403 -> "Your session may have expired. Sign in again."
@@ -109,6 +133,7 @@ internal class Base44Api(
         const val BASE_URL = "https://base44.app/api/apps/6ac1b21923bd8a65822f7956"
         const val APP_ID = "6ac1b21923bd8a65822f7956"
         const val CONNECT_TIMEOUT_MS = 12_000
-        const val READ_TIMEOUT_MS = 20_000
+        const val READ_TIMEOUT_MS = 90_000
+        val FUNCTIONS = setOf("mobileAccount", "getSmsCatalog", "getSmsOffers", "getPurchasePrice", "provisionNumber", "fetchInbox", "registerDeviceToken", "createCheckoutPayment", "verifyCheckoutPayment")
     }
 }

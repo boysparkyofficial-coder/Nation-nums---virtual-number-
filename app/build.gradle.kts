@@ -13,8 +13,8 @@ android {
         applicationId = "com.base44.nationnums"
         minSdk = 24
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.0.23"
+        versionCode = 14
+        versionName = "1.0.24"
     }
 
     buildTypes {

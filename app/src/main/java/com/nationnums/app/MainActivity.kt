@@ -132,6 +132,13 @@ class MainActivity : FragmentActivity() {
 
     fun clearRelockFlag() { shouldLockOnResume = false }
 
+    var shouldOpenNotifications by mutableStateOf(false)
+        private set
+
+    fun consumeNotificationNavigationRequest() {
+        shouldOpenNotifications = false
+    }
+
     override fun onStop() {
         super.onStop()
         if (!isChangingConfigurations && !isFinishing) shouldLockOnResume = true
@@ -139,6 +146,11 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent?.action == ACTION_OPEN_NOTIFICATIONS ||
+            intent?.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false) == true
+        ) {
+            shouldOpenNotifications = true
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -157,6 +169,21 @@ class MainActivity : FragmentActivity() {
                 NationNumsApp(this@MainActivity)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == ACTION_OPEN_NOTIFICATIONS ||
+            intent.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false)
+        ) {
+            shouldOpenNotifications = true
+        }
+    }
+
+    companion object {
+        const val ACTION_OPEN_NOTIFICATIONS = "com.nationnums.app.OPEN_NOTIFICATIONS"
+        const val EXTRA_OPEN_NOTIFICATIONS = "open_notifications"
     }
 }
 
@@ -318,6 +345,15 @@ private fun NationNumsApp(activity: MainActivity) {
         var ordersLoading by remember { mutableStateOf(false) }
         var ordersError by remember { mutableStateOf("") }
         val repository = remember { NationNumsRepository { sessionStore.readToken() } }
+
+        LaunchedEffect(activity.shouldOpenNotifications, signedInUser?.id, showSignIn) {
+            if (activity.shouldOpenNotifications && signedInUser != null && !showSignIn) {
+                selectedTab = AppTab.Home
+                selectedPage = ServicePage.Notifications
+                notificationsRefresh++
+                activity.consumeNotificationNavigationRequest()
+            }
+        }
 
         LaunchedEffect(signedInUser?.id, selectedTab, selectedPage, notificationsRefresh, numbersRefresh, ordersRefresh, walletRefresh) {
             if (signedInUser != null && selectedPage == ServicePage.Notifications) {

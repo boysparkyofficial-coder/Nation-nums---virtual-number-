@@ -20,6 +20,11 @@ internal class AppLockStore(context: Context) {
 
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC, false)
 
+    /** Updates biometric preference only after the Android system prompt succeeds. */
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC, enabled).apply()
+    }
+
     fun isLockedOut(): Boolean = System.currentTimeMillis() < prefs.getLong(KEY_LOCKED_UNTIL, 0L)
 
     fun remainingLockoutSeconds(): Long =

@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p app/build/verification
-          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" /usr/local/lib/android/sdk /opt/android-sdk -type f -name apksigner 2>/dev/null | sort -V | tail -1)"
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" /usr/local/lib/android/sdk /opt/android-sdk -type f -name apksigner 2>/dev/null | sort -V | tail -1 || true)"
           if [ -z "$APKSIGNER" ]; then
             echo "Could not locate Android apksigner in the runner SDK."
             exit 1
@@ -79,7 +79,7 @@ jobs:
           if len(fingerprint) != 64:
               raise SystemExit(f"Expected 64 SHA-256 hex characters, got {len(fingerprint)}.")
           formatted = ":".join(fingerprint[i:i+2] for i in range(0, 64, 2))
-          Path("app/build/verification/debug-sha256.txt").write_text(formatted + "\\n")
+          Path("app/build/verification/debug-sha256.txt").write_text(formatted + "\n")
           print("Debug signing certificate SHA-256:", formatted)
           PY
 

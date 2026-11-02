@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "909186547252",
+    "project_id": "assistant-ai-ndell",
+    "storage_bucket": "assistant-ai-ndell.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909186547252:android:5e894b724b17237bea5461",
+        "android_client_info": {
+          "package_name": "com.base44.nationnums"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUyf_FwbwTRXyNR7Xx_14EucNta027ONo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

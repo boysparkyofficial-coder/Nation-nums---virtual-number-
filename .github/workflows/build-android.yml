@@ -99,7 +99,7 @@ jobs:
           match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})\s*$", text)
           if not match:
               raise SystemExit("Could not read a complete persistent keystore SHA-256 fingerprint.")
-          actual = re.sub(r"[^0-9a-f]", "", match.group(1)).upper()
+          actual = re.sub(r"[^0-9A-Fa-f]", "", match.group(1)).upper()
           if len(actual) != 64:
               raise SystemExit(f"Persistent keystore fingerprint has {len(actual)} hex characters, expected 64.")
           formatted = ":".join(actual[i:i+2] for i in range(0, 64, 2))
@@ -131,10 +131,10 @@ jobs:
           if not keystore_match:
               print(keystore_output)
               raise SystemExit("Could not parse the persistent keystore SHA-256 fingerprint.")
-          expected = re.sub(r"[^0-9a-f]", "", keystore_match.group(1)).upper()
+          expected = re.sub(r"[^0-9A-Fa-f]", "", keystore_match.group(1)).upper()
 
           def normalize(value):
-              return re.sub(r"[^0-9a-f]", "", value).upper()
+              return re.sub(r"[^0-9A-Fa-f]", "", value).upper()
 
           apk_output = Path("app/build/verification/debug-certificate.txt").read_text()
           apk_match = re.search(r"(?i)certificate SHA-256 digest:\s*([0-9a-f:]{64,95})", apk_output)

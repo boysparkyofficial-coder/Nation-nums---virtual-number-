@@ -131,6 +131,7 @@ private val Green = Color(0xFF17845D)
 class MainActivity : FragmentActivity() {
     var shouldLockOnResume by mutableStateOf(false)
         private set
+    private var lastUserInteractionElapsed = android.os.SystemClock.elapsedRealtime()
 
     var notificationDestination by mutableStateOf<String?>(null)
         private set
@@ -141,10 +142,24 @@ class MainActivity : FragmentActivity() {
         notificationDestination = intent.dataString ?: intent.getStringExtra("notification_destination")
     }
     fun clearRelockFlag() { shouldLockOnResume = false }
+    fun lastInteractionTime(): Long = lastUserInteractionElapsed
+
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            lastUserInteractionElapsed = android.os.SystemClock.elapsedRealtime()
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        shouldLockOnResume =
+            android.os.SystemClock.elapsedRealtime() - lastUserInteractionElapsed >= 15 * 60 * 1000L
+    }
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations && !isFinishing) shouldLockOnResume = true
+        // Locking is based on 15 minutes without user interaction, not every app switch.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -226,6 +241,19 @@ private fun NationNumsApp(activity: MainActivity) {
                 gateError = ""
             }
             activity.clearRelockFlag()
+        }
+    }
+
+    // Enforce a 15-minute inactivity timeout even while the app remains in the foreground.
+    LaunchedEffect(gateState) {
+        while (gateState == GateState.Dashboard) {
+            kotlinx.coroutines.delay(1000)
+            val inactiveFor = android.os.SystemClock.elapsedRealtime() - activity.lastInteractionTime()
+            if (lockStore.isConfigured() && inactiveFor >= 15 * 60 * 1000L) {
+                gateError = ""
+                gateState = GateState.Locked
+                break
+            }
         }
     }
 

@@ -133,6 +133,7 @@ internal fun NationWebsiteScreen(
         onDispose {
             pendingFileCallback?.onReceiveValue(null)
             pendingFileCallback = null
+            webView?.removeJavascriptInterface("NationNative")
             webView?.removeJavascriptInterface("NationNumsNative")
             webView?.removeJavascriptInterface("NativeApp")
             webView?.removeJavascriptInterface("Android")
@@ -151,6 +152,8 @@ internal fun NationWebsiteScreen(
                     webView = this
                     NationNumsBiometricBridge(activity, this).also { bridge ->
                         biometricBridge = bridge
+                        // The Base44 website's AppLockGate expects this exact bridge name.
+                        addJavascriptInterface(bridge, "NationNative")
                         addJavascriptInterface(bridge, "NationNumsNative")
                         addJavascriptInterface(bridge, "NativeApp")
                         addJavascriptInterface(bridge, "Android")

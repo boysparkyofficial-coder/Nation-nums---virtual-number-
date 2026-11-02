@@ -131,6 +131,8 @@ private val Green = Color(0xFF17845D)
 class MainActivity : FragmentActivity() {
     var shouldLockOnResume by mutableStateOf(false)
         private set
+    var resumeGeneration by mutableStateOf(0)
+        private set
     private var lastUserInteractionElapsed = android.os.SystemClock.elapsedRealtime()
 
     var notificationDestination by mutableStateOf<String?>(null)
@@ -153,13 +155,14 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        shouldLockOnResume =
-            android.os.SystemClock.elapsedRealtime() - lastUserInteractionElapsed >= 15 * 60 * 1000L
+        // Notify Compose on every foreground return so biometric enrollment and relock
+        // state are refreshed after Android Settings or another app was opened.
+        resumeGeneration += 1
     }
 
     override fun onStop() {
         super.onStop()
-        // Locking is based on 15 minutes without user interaction, not every app switch.
+        if (!isChangingConfigurations) shouldLockOnResume = true
     }
 
     private var websiteBiometricPromptActive = false
@@ -265,7 +268,7 @@ internal enum class ServicePage(val title: String, val subtitle: String) {
     Legal("Policies & app information", "Privacy, terms and app details")
 }
 
-private enum class GateState { Setup, Locked, Dashboard }
+private enum class GateState { Setup, Locked, WelcomeBack, Dashboard }
 
 @Composable
 private fun NationNumsApp(activity: MainActivity) {
@@ -273,25 +276,29 @@ private fun NationNumsApp(activity: MainActivity) {
     val sessionStore = remember { Base44SessionStore(activity) }
     var gateState by remember {
         mutableStateOf(
-            if (lockStore.isConfigured() && !sessionStore.readToken().isNullOrBlank())
-                GateState.Locked else GateState.Dashboard
+            if (!sessionStore.readToken().isNullOrBlank() && lockStore.isLockEnabled()) {
+                if (lockStore.isConfigured()) GateState.Locked else GateState.Setup
+            } else GateState.Dashboard
         )
     }
     var gateError by remember { mutableStateOf("") }
-    // Some Android devices expose secure fingerprint/face sensors as BIOMETRIC_WEAK.
-    // Checking only BIOMETRIC_STRONG can incorrectly hide an enrolled biometric.
-    val biometricAvailable = remember {
+    var welcomeUsername by remember { mutableStateOf("") }
+    var biometricAvailable by remember { mutableStateOf(
         BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
             BiometricManager.BIOMETRIC_SUCCESS
-    }
-
-    LaunchedEffect(activity.shouldLockOnResume) {
+    ) }
+    // Some Android devices expose secure fingerprint/face sensors as BIOMETRIC_WEAK.
+    // Checking only BIOMETRIC_STRONG can incorrectly hide an enrolled biometric.
+    LaunchedEffect(activity.resumeGeneration) {
+        biometricAvailable = BiometricManager.from(activity).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
+        ) == BiometricManager.BIOMETRIC_SUCCESS
         if (activity.shouldLockOnResume) {
-            if (gateState == GateState.Dashboard &&
-                lockStore.isConfigured() && !sessionStore.readToken().isNullOrBlank()
+            if (lockStore.isLockEnabled() && !sessionStore.readToken().isNullOrBlank() &&
+                gateState != GateState.Setup && gateState != GateState.Locked
             ) {
-                gateState = GateState.Locked
                 gateError = ""
+                gateState = if (lockStore.isConfigured()) GateState.Locked else GateState.Setup
             }
             activity.clearRelockFlag()
         }
@@ -302,12 +309,64 @@ private fun NationNumsApp(activity: MainActivity) {
         while (gateState == GateState.Dashboard) {
             kotlinx.coroutines.delay(1000)
             val inactiveFor = android.os.SystemClock.elapsedRealtime() - activity.lastInteractionTime()
-            if (lockStore.isConfigured() && inactiveFor >= 15 * 60 * 1000L) {
+            if (lockStore.isLockEnabled() && inactiveFor >= 15 * 60 * 1000L) {
                 gateError = ""
                 gateState = GateState.Locked
                 break
             }
         }
+    }
+
+    fun showWelcomeBack() {
+        welcomeUsername = ""
+        gateState = GateState.WelcomeBack
+        Base44AuthApi(sessionStore).currentUser { result ->
+            if (gateState == GateState.WelcomeBack && result.success) {
+                welcomeUsername = result.user?.username.orEmpty().trim()
+            }
+        }
+    }
+
+    fun requestBiometricEnable(onResult: (Boolean, String) -> Unit) {
+        val manager = BiometricManager.from(activity)
+        val availability = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+        if (availability == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED) {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Intent(android.provider.Settings.ACTION_BIOMETRIC_ENROLL).putExtra(
+                    android.provider.Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+                )
+            } else Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
+            runCatching { activity.startActivity(intent) }
+                .onSuccess { onResult(false, "Complete biometric enrollment in Android Settings, return here, then switch biometric unlock on again.") }
+                .onFailure { onResult(false, "Could not open Android biometric settings. Enable fingerprint or face unlock in device Settings.") }
+            return
+        }
+        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+            onResult(false, "Biometric authentication is not available. Use your app passcode.")
+            return
+        }
+        val prompt = BiometricPrompt(
+            activity,
+            ContextCompat.getMainExecutor(activity),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    onResult(true, "Biometric unlock enabled.")
+                }
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    onResult(false, "Biometric unlock was not enabled. " + errString)
+                }
+            }
+        )
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Enable biometric unlock")
+            .setSubtitle("Verify your fingerprint or face to enable it for Nation Nums")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+            .setNegativeButtonText("Cancel")
+            .build()
+        prompt.authenticate(info)
     }
 
     fun promptBiometric() {
@@ -322,7 +381,7 @@ private fun NationNumsApp(activity: MainActivity) {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
                     gateError = ""
-                    gateState = GateState.Dashboard
+                    showWelcomeBack()
                 }
 
                 override fun onAuthenticationFailed() {
@@ -388,7 +447,7 @@ private fun NationNumsApp(activity: MainActivity) {
                 } else if (lockStore.verifyPassword(password)) {
                     lockStore.clearFailedAttempts()
                     gateError = ""
-                    gateState = GateState.Dashboard
+                    showWelcomeBack()
                 } else {
                     val attemptsRemaining = lockStore.recordFailedAttempt()
                     gateError = if (attemptsRemaining <= 0) {
@@ -398,8 +457,22 @@ private fun NationNumsApp(activity: MainActivity) {
                     }
                 }
             },
-            onBiometric = { promptBiometric() }
+            onBiometric = { promptBiometric() },
+            onBiometricToggle = { enabled, result ->
+                if (!enabled) {
+                    lockStore.setBiometricEnabled(false)
+                    result(false, "Biometric unlock disabled.")
+                } else requestBiometricEnable { success, message ->
+                    if (success) lockStore.setBiometricEnabled(true)
+                    result(success, message)
+                }
+            }
         )
+    } else if (gateState == GateState.WelcomeBack) {
+        WelcomeBackScreen(username = welcomeUsername, onContinue = {
+            gateError = ""
+            gateState = GateState.Dashboard
+        })
     } else {
         NationWebsiteScreen(activity = activity, sessionStore = sessionStore)
     }
@@ -590,6 +663,28 @@ private fun SignInScreen(
 }
 
 @Composable
+private fun WelcomeBackScreen(username: String, onContinue: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.White).padding(28.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            BrandMark()
+            Spacer(Modifier.height(28.dp))
+            Text("Welcome back", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            if (username.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text("@${username.removePrefix("@")}", color = NationBlue, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Text("Your account is ready.", color = Muted, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(28.dp))
+            Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
+                Text("Continue to Nation Nums", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
 private fun AppLockScreen(
     isSetup: Boolean,
     biometricAvailable: Boolean,
@@ -597,7 +692,8 @@ private fun AppLockScreen(
     errorMessage: String,
     onCreatePassword: (String, Boolean) -> Unit,
     onUnlockPassword: (String) -> Unit,
-    onBiometric: () -> Unit
+    onBiometric: () -> Unit,
+    onBiometricToggle: (Boolean, (Boolean, String) -> Unit) -> Unit
 ) {
     var passcode by remember(isSetup) { mutableStateOf("") }
     var confirmCode by remember(isSetup) { mutableStateOf("") }
@@ -723,13 +819,22 @@ private fun AppLockScreen(
                     }
                 }
             }
-            if (isSetup && biometricAvailable) {
+            if (isSetup) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(checked = enableBiometric, onCheckedChange = { enableBiometric = it })
-                    Text("Enable fingerprint unlock", color = Ink, fontSize = 13.sp)
+                    Checkbox(
+                        checked = enableBiometric,
+                        onCheckedChange = { checked ->
+                            if (!checked) enableBiometric = false
+                            else onBiometricToggle(true) { success, message ->
+                                enableBiometric = success
+                                localError = message
+                            }
+                        }
+                    )
+                    Text("Enable biometric unlock", color = Ink, fontSize = 13.sp)
                 }
             }
             if (shownError.isNotBlank()) {

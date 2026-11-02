@@ -20,6 +20,14 @@ internal class AppLockStore(context: Context) {
 
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC, false)
 
+    /** A biometric-only lock is valid even when no separate app passcode was configured. */
+    fun isLockEnabled(): Boolean = isConfigured() || isBiometricEnabled()
+
+    /** Persist the biometric preference only after a successful system biometric prompt. */
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC, enabled).apply()
+    }
+
     fun isLockedOut(): Boolean = System.currentTimeMillis() < prefs.getLong(KEY_LOCKED_UNTIL, 0L)
 
     fun remainingLockoutSeconds(): Long =

@@ -48,14 +48,57 @@ internal class NationNumsBiometricBridge(
     @JavascriptInterface
     fun isAvailable(): Boolean = isBiometricAvailable()
 
-    /** Sync the website's authenticated biometric preference to the native foreground lock. */
+    /**
+     * Keep the website preference and native foreground lock in sync.
+     * Enabling is never accepted silently: Android must verify a biometric first.
+     */
     @JavascriptInterface
     fun setBiometricLockEnabled(enabled: Boolean) {
         activity.runOnUiThread {
-            if (isTrustedOrigin()) {
-                AppLockStore(activity).setBiometricEnabled(enabled)
+            if (!isTrustedOrigin()) return@runOnUiThread
+            val store = AppLockStore(activity)
+            if (!enabled) {
+                store.setBiometricEnabled(false)
+                dispatchPreferenceResult(true, false)
+                return@runOnUiThread
+            }
+
+            val manager = androidx.biometric.BiometricManager.from(activity)
+            val availability = manager.canAuthenticate(
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+            if (availability == androidx.biometric.BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED) {
+                val enrollIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    android.content.Intent(android.provider.Settings.ACTION_BIOMETRIC_ENROLL).putExtra(
+                        android.provider.Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                        androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    )
+                } else {
+                    android.content.Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
+                }
+                runCatching { activity.startActivity(enrollIntent) }
+                dispatchPreferenceResult(false, true)
+                return@runOnUiThread
+            }
+            if (availability != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+                dispatchPreferenceResult(false, false)
+                return@runOnUiThread
+            }
+
+            activity.authenticateWebsiteBiometric { success ->
+                if (success && isTrustedOrigin()) store.setBiometricEnabled(true)
+                dispatchPreferenceResult(success, false)
             }
         }
+    }
+
+    private fun dispatchPreferenceResult(success: Boolean, enrollmentOpened: Boolean) {
+        val script = """
+            window.dispatchEvent(new CustomEvent('nationNumsBiometricPreferenceResult', {
+              detail: { success: $success, enrollmentOpened: $enrollmentOpened }
+            }));
+        """.trimIndent()
+        webView.post { webView.evaluateJavascript(script, null) }
     }
 
     private fun dispatchResult(success: Boolean) {

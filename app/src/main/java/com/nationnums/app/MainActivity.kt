@@ -138,7 +138,7 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        notificationDestination = intent.getStringExtra("notification_destination")
+        notificationDestination = intent.dataString ?: intent.getStringExtra("notification_destination")
     }
     fun clearRelockFlag() { shouldLockOnResume = false }
 
@@ -149,7 +149,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        notificationDestination = intent?.getStringExtra("notification_destination")
+        notificationDestination = intent?.dataString ?: intent?.getStringExtra("notification_destination")
         setContent {
             MaterialTheme(
                 colorScheme = lightColorScheme(
@@ -210,8 +210,10 @@ private fun NationNumsApp(activity: MainActivity) {
         )
     }
     var gateError by remember { mutableStateOf("") }
+    // Some Android devices expose secure fingerprint/face sensors as BIOMETRIC_WEAK.
+    // Checking only BIOMETRIC_STRONG can incorrectly hide an enrolled biometric.
     val biometricAvailable = remember {
-        BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+        BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
             BiometricManager.BIOMETRIC_SUCCESS
     }
 
@@ -266,10 +268,11 @@ private fun NationNumsApp(activity: MainActivity) {
             // pattern or password. Older Android versions retain the app-passcode
             // fallback shown by AppLockScreen.
             promptBuilder.setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or
                     BiometricManager.Authenticators.DEVICE_CREDENTIAL
             )
         } else {
+            promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
             promptBuilder.setNegativeButtonText("Use app password")
         }
         prompt.authenticate(promptBuilder.build())

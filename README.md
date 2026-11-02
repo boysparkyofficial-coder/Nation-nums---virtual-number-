@@ -40,10 +40,14 @@ Connected core: server-calculated wallet balance and paginated ledger; session-s
 
 Deploy/publish the Base44 changes containing mobileAccount and the updated purchase/payment functions before distributing this APK. CI runs unit tests and produces the rebuilt APK; customer transactions and real push delivery still require device acceptance testing.
 
-Remaining native flows: rental checkout, proxies, email OTP, social marketplace, NationFlow virtual-account setup, support tickets, provider-aware cancellation, and Google sign-in. QR numbers and VTU have no verified backend purchase contract and remain unavailable. Mobile push sending remains disabled until a valid rotated Firebase server service-account credential is supplied securely to the backend; google-services.json is not that credential.
+Native service pages now mirror the current website's customer catalogue: virtual numbers, US numbers, rentals, Email OTP, proxy marketplace, social media logs and wallet/orders/support. Proxy filters include product type, country, protocol, IP version, rotation, session, billing and maximum unit price. Social listings include provider categories, search, pagination, stock, server-quoted purchases and the verified-WhatsApp resend action in order history. VTU remains clearly marked Coming soon on both website and app; QR-number purchasing remains unavailable until the website/backend exposes a verified purchase flow. Mobile push sending remains disabled until a valid rotated Firebase server service-account credential is supplied securely to the backend; google-services.json is not that credential.
 
 
-## Connected customer backend — 1.0.25
+## Connected customer backend — 1.0.26
 Native screens use the existing Nation Nums customer session and backend for SMS/US numbers, rental catalogues/prices, Email OTP, proxy quotes/purchases/usage and credentials, social account purchases/delivery history, cancellation/refunds, wallet checkout/bank transfers, support tickets/replies, API keys, Telegram linking, profile updates and WhatsApp verification. Purchases and wallet mutations stay server-side with existing pricing and profit rules unchanged.
 
 Admin/provider credentials and admin-only operations are never embedded in the APK. QR-number purchases, VTU, rental extension and team management have no supported customer backend implementation. Android push registration is connected; sending requires valid server-side Firebase credentials. Install this commit's successfully built APK to receive the native changes.
+
+
+## Website feature parity — 1.0.26
+The native dashboard and service directory are aligned with the current Nation Nums website catalogue. Proxy browsing uses the same live catalogue facets and quote/purchase functions as the website, including an explicit second confirmation if the supplier price changes. Social Media Logs supports provider categories, search, paging, stock-aware availability and idempotent purchase requests; delivered social orders can be sent to the customer's verified WhatsApp from order history. Nigerian VTU is displayed as Coming soon and accepts no payment until a verified provider contract is connected. No supplier credentials or direct wallet writes are included in the APK.

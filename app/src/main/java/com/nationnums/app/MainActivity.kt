@@ -1190,7 +1190,7 @@ private fun ServicesScreen(
         Triple(ServicePage.EmailOtp, "Email OTP", "Email verification services"),
         Triple(ServicePage.Proxies, "Proxy services", "Available proxy products"),
         Triple(ServicePage.SocialMediaLogs, "Social media accounts", "Eligible listings supplied by YoungPG Media"),
-        Triple(ServicePage.VirtualTopUp, "Virtual top-up", "Airtime, data and supported bill payments")
+        Triple(ServicePage.VirtualTopUp, "Virtual top-up", "Airtime, data and bill payments · Coming soon")
     )
     val filteredServices = services.filter {
         it.second.contains(query, ignoreCase = true) || it.third.contains(query, ignoreCase = true)
@@ -1714,7 +1714,7 @@ private fun ServiceDetailPage(page: ServicePage, onBack: () -> Unit, onSignIn: (
             InfoNotice(when (page) {
                 ServicePage.ApiKeys -> "API key management is separate from API Documentation. The real key list and key actions must be connected to the verified backend before use."
                 ServicePage.SocialMediaLogs -> "Only account listings actually supplied by YoungPG Media and legitimately transferable will be shown. Live catalogue, prices and purchase actions must be connected to the verified backend before use."
-                ServicePage.VirtualTopUp -> "The VTU marketplace is being prepared. BillsJet is still under consideration because registration is unavailable; do not accept payments until a provider API is selected and tested."
+                ServicePage.VirtualTopUp -> "Nigerian VTU is coming soon. Airtime, data and bill payments will be available here once a supported provider is connected. No top-up order can be started yet, and nothing is charged to your wallet."
                 ServicePage.Notifications -> "Your real notifications will appear after account and push-notification integration is completed."
                 ServicePage.Security -> "Your account uses Nation Nums authentication. Password resets are available in Profile → Account details; the app passcode below protects this device only."
                 ServicePage.Support -> "Support ticket history and replies will load after the existing support endpoints are verified."

@@ -56,6 +56,8 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
             ?: Intent(this, MainActivity::class.java)
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        launchIntent.action = MainActivity.ACTION_OPEN_NOTIFICATIONS
+        launchIntent.putExtra(MainActivity.EXTRA_OPEN_NOTIFICATIONS, true)
         data["type"]?.let { launchIntent.putExtra("notification_type", it) }
         val pendingIntent = PendingIntent.getActivity(
             this,

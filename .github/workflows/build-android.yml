@@ -32,37 +32,14 @@ jobs:
 
       # Keep one debug signing identity across builds so installed APKs can update
       # and the App Links fingerprint remains stable. This repo is private.
-      - name: Restore persistent debug signing key
+      # Restore the original signing identity used by established Nation Nums builds.
+      # Fail closed if it is unavailable; never generate or rotate a signing key.
+      - name: Restore original Nation Nums signing key
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
-          key: nation-nums-debug-signing-keystore-v3
-
-      - name: Create the new persistent Nation Nums signing key if needed
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.android"
-          if [ ! -f "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair -v \
-              -keystore "$HOME/.android/debug.keystore" \
-              -storepass android \
-              -keypass android \
-              -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Nation Nums Android, OU=Mobile, O=Nation Nums, L=Lagos, ST=Lagos, C=NG"
-            echo "Created the new Nation Nums signing identity. The cache action will persist it after this successful run."
-          else
-            echo "Restored the persistent Nation Nums signing identity from Actions cache."
-          fi
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
-
-      # Persist the signing identity immediately, before tests/build steps can fail.
-      - name: Save persistent Nation Nums signing key
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: nation-nums-debug-signing-keystore-v3
+          key: nation-nums-debug-signing-keystore-v1
+          fail-on-cache-miss: true
 
       - name: Download admin-managed logo, with safe build fallback
         run: |
@@ -115,10 +92,15 @@ jobs:
           if not match:
               raise SystemExit("Could not read a complete persistent keystore SHA-256 fingerprint.")
           actual = re.sub(r"[^0-9A-Fa-f]", "", match.group(1)).upper()
+          expected = "0705A0EE75BE51704280EDBA2D3BA48C7DD573BB8ACF05FCD150C18B10B6BEF2"
           if len(actual) != 64:
               raise SystemExit(f"Persistent keystore fingerprint has {len(actual)} hex characters, expected 64.")
+          if actual != expected:
+              raise SystemExit(
+                  "Signing identity mismatch. Refusing to build with a different Nation Nums certificate."
+              )
           formatted = ":".join(actual[i:i+2] for i in range(0, 64, 2))
-          print("Persistent Nation Nums signing certificate fingerprint:", formatted)
+          print("Verified original Nation Nums signing certificate:", formatted)
           PY
 
       - name: Export debug signing certificate fingerprint for Android App Links

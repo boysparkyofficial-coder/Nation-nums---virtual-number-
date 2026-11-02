@@ -26,6 +26,30 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      # Keep one debug signing identity across builds so installed APKs can update
+      # and the App Links fingerprint remains stable. This repo is private.
+      - name: Restore persistent debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: nation-nums-debug-signing-keystore-v1
+
+      - name: Ensure debug signing key exists
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -noprompt \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+
       - name: Download admin-managed logo, with safe build fallback
         run: |
           mkdir -p app/src/main/res/drawable-nodpi

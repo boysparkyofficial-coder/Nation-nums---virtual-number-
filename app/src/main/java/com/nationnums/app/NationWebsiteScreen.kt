@@ -133,6 +133,7 @@ internal fun NationWebsiteScreen(
         onDispose {
             pendingFileCallback?.onReceiveValue(null)
             pendingFileCallback = null
+            webView?.removeJavascriptInterface("NationNative")
             webView?.removeJavascriptInterface("NationNumsNative")
             webView?.removeJavascriptInterface("NativeApp")
             webView?.removeJavascriptInterface("Android")

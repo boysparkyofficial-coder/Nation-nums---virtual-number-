@@ -2,7 +2,7 @@ name: Build Nation Nums Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/native-firebase-push]
   workflow_dispatch:
 
 permissions:

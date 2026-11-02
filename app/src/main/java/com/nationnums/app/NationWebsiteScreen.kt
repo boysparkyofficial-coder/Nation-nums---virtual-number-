@@ -241,7 +241,11 @@ internal fun NationWebsiteScreen(
                         }
                     })
 
-                    loadUrl(NATION_SITE)
+                    val incomingLink = activity.intent?.data
+            val safeIncomingLink = incomingLink?.takeIf {
+                it.scheme.equals("https", true) && it.host.equals("nation-nums.base44.app", true)
+            }
+            loadUrl(safeIncomingLink?.toString() ?: NATION_SITE)
                 }
             },
             update = { view ->

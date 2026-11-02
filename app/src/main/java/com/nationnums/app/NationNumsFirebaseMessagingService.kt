@@ -45,8 +45,8 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Nation Nums updates",
-                NotificationManager.IMPORTANCE_DEFAULT
+                "Nation Nums alerts",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Wallet, order, number and account updates"
             }
@@ -65,11 +65,11 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(applicationInfo.icon)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -83,7 +83,7 @@ class NationNumsFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         const val PREFS = "nation_nums_push"
         const val KEY_FCM_TOKEN = "fcm_registration_token"
-        private const val CHANNEL_ID = "nation_nums_updates"
+        private const val CHANNEL_ID = "nation_nums_updates_v2"
         private const val NOTIFICATION_ID = 7402
     }
 }

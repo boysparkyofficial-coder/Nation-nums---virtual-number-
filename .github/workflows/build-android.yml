@@ -59,10 +59,18 @@ jobs:
       - name: Export debug signing certificate fingerprint for Android App Links
         run: |
           mkdir -p app/build/verification
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" /usr/local/lib/android/sdk /opt/android-sdk -type f -name apksigner 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "Could not locate Android apksigner in the runner SDK."
+            exit 1
+          fi
           "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/verification/debug-certificate.txt
-          HEX="$(grep "Signer #1 certificate SHA-256 digest:" app/build/verification/debug-certificate.txt | head -1 | awk -F': ' '{print toupper($2)}')"
-          test -n "$HEX"
+          cat app/build/verification/debug-certificate.txt
+          HEX="$(grep -i "certificate SHA-256 digest:" app/build/verification/debug-certificate.txt | head -1 | awk -F': ' '{print toupper($2)}')"
+          if [ -z "$HEX" ]; then
+            echo "Could not read the APK signing certificate SHA-256 fingerprint."
+            exit 1
+          fi
           echo "$HEX" | sed 's/../&:/g; s/:$//' > app/build/verification/debug-sha256.txt
           echo "Debug signing certificate SHA-256:"
           cat app/build/verification/debug-sha256.txt

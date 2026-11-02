@@ -56,6 +56,14 @@ jobs:
           fi
           keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
 
+      # Persist the signing identity immediately, before tests/build steps can fail.
+      - name: Save persistent Nation Nums signing key
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: nation-nums-debug-signing-keystore-v2
+
       - name: Download admin-managed logo, with safe build fallback
         run: |
           mkdir -p app/src/main/res/drawable-nodpi

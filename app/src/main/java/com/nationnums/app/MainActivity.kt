@@ -162,6 +162,59 @@ class MainActivity : FragmentActivity() {
         // Locking is based on 15 minutes without user interaction, not every app switch.
     }
 
+    private var websiteBiometricPromptActive = false
+
+    /** Called only by the first-party Nation Nums WebView bridge. */
+    fun authenticateWebsiteBiometric(callback: (Boolean) -> Unit) {
+        runOnUiThread {
+            if (websiteBiometricPromptActive) {
+                callback(false)
+                return@runOnUiThread
+            }
+            val manager = BiometricManager.from(this)
+            if (manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) !=
+                BiometricManager.BIOMETRIC_SUCCESS
+            ) {
+                callback(false)
+                return@runOnUiThread
+            }
+            websiteBiometricPromptActive = true
+            val prompt = BiometricPrompt(
+                this,
+                ContextCompat.getMainExecutor(this),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    private fun finish(success: Boolean) {
+                        websiteBiometricPromptActive = false
+                        callback(success)
+                    }
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        finish(true)
+                    }
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                    }
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        super.onAuthenticationError(errorCode, errString)
+                        finish(false)
+                    }
+                }
+            )
+            val info = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Nation Nums")
+                .setSubtitle("Verify your identity to continue")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                .setNegativeButtonText("Cancel")
+                .build()
+            try {
+                prompt.authenticate(info)
+            } catch (_: Exception) {
+                websiteBiometricPromptActive = false
+                callback(false)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         notificationDestination = intent?.dataString ?: intent?.getStringExtra("notification_destination")

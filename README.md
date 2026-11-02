@@ -58,4 +58,4 @@ The native dashboard and service directory are aligned with the current Nation N
 - The biometric prompt's fallback is the app passcode on all supported Android versions; it does not substitute the phone's unrelated screen-lock PIN.
 - After successful unlock, the app displays the signed-in user's welcome-back screen.
 - The Android manifest verifies HTTPS links for `nation-nums.base44.app`. Publish `docs/assetlinks.json` at `https://nation-nums.base44.app/.well-known/assetlinks.json` on the website host to complete Android domain verification.
-- The build restores the original signing-key cache and fails closed if that key is unavailable or its SHA-256 certificate fingerprint differs from the established fingerprint. It must never generate a replacement signing identity.
+- The build restores the latest successful signing-key cache and fails closed if that key is unavailable or its SHA-256 certificate fingerprint differs from the fingerprint from successful build #171. It must never generate a replacement signing identity. It restores the exact key used by successful build #171.

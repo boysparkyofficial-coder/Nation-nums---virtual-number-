@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
-          key: nation-nums-debug-signing-keystore-v1
+          key: nation-nums-debug-signing-keystore-v3
           fail-on-cache-miss: true
 
       - name: Download admin-managed logo, with safe build fallback
@@ -92,7 +92,7 @@ jobs:
           if not match:
               raise SystemExit("Could not read a complete persistent keystore SHA-256 fingerprint.")
           actual = re.sub(r"[^0-9A-Fa-f]", "", match.group(1)).upper()
-          expected = "0705A0EE75BE51704280EDBA2D3BA48C7DD573BB8ACF05FCD150C18B10B6BEF2"
+          expected = "3A4F2802710D775473424494527648B6044D3B500166B2EF4A68881360CCF96A"
           if len(actual) != 64:
               raise SystemExit(f"Persistent keystore fingerprint has {len(actual)} hex characters, expected 64.")
           if actual != expected:

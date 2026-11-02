@@ -64,16 +64,22 @@ jobs:
             echo "Could not locate Android apksigner in the runner SDK."
             exit 1
           fi
-          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/verification/debug-certificate.txt
-          cat app/build/verification/debug-certificate.txt
-          HEX="$(grep -i "certificate SHA-256 digest:" app/build/verification/debug-certificate.txt | head -1 | awk -F': ' '{print toupper($2)}')"
-          if [ -z "$HEX" ]; then
-            echo "Could not read the APK signing certificate SHA-256 fingerprint."
-            exit 1
-          fi
-          echo "$HEX" | sed 's/../&:/g; s/:$//' > app/build/verification/debug-sha256.txt
-          echo "Debug signing certificate SHA-256:"
-          cat app/build/verification/debug-sha256.txt
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/verification/debug-certificate.txt 2>&1
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          certificate_output = Path("app/build/verification/debug-certificate.txt").read_text()
+          match = re.search(r"(?i)certificate SHA-256 digest:\s*([0-9a-f:]{64,95})", certificate_output)
+          if not match:
+              print(certificate_output)
+              raise SystemExit("Could not parse the APK signing certificate SHA-256 fingerprint.")
+          fingerprint = re.sub(r"[^0-9a-f]", "", match.group(1)).upper()
+          if len(fingerprint) != 64:
+              raise SystemExit(f"Expected 64 SHA-256 hex characters, got {len(fingerprint)}.")
+          formatted = ":".join(fingerprint[i:i+2] for i in range(0, 64, 2))
+          Path("app/build/verification/debug-sha256.txt").write_text(formatted + "\\n")
+          print("Debug signing certificate SHA-256:", formatted)
+          PY
 
       - name: Upload debug App Links fingerprint
         uses: actions/upload-artifact@v6

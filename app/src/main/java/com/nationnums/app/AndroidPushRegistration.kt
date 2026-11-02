@@ -5,7 +5,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import java.util.UUID
 import org.json.JSONObject
 
-internal class AndroidPushRegistration(context: Context, private val sessions: Base44SessionStore) {
+internal class AndroidPushRegistration(private val context: Context, private val sessions: Base44SessionStore) {
     private val prefs = context.applicationContext.getSharedPreferences(NationNumsFirebaseMessagingService.PREFS, Context.MODE_PRIVATE)
     private val api = Base44Api { sessions.readToken() }
     private fun deviceId(): String = prefs.getString("device_id", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("device_id", it).apply() }

@@ -428,17 +428,9 @@ private fun NationNumsApp(activity: MainActivity) {
                 if (password.length < 4) {
                     gateError = "Choose an app password with at least 4 characters."
                 } else {
-                    lockStore.configurePassword(password, false)
-                    if (enableBiometric) {
-                        requestBiometricEnable { enabled, message ->
-                            if (enabled) lockStore.setBiometricEnabled(true)
-                            gateError = if (enabled) "" else message
-                            gateState = GateState.Dashboard
-                        }
-                    } else {
-                        gateError = ""
-                        gateState = GateState.Dashboard
-                    }
+                    lockStore.configurePassword(password, lockStore.isBiometricEnabled())
+                    gateError = ""
+                    gateState = GateState.Dashboard
                 }
             },
             onUnlockPassword = { password ->
@@ -459,8 +451,13 @@ private fun NationNumsApp(activity: MainActivity) {
             },
             onBiometric = { promptBiometric() },
             onBiometricToggle = { enabled, result ->
-                if (!enabled) result(false, "Biometric unlock remains off.")
-                else requestBiometricEnable(result)
+                if (!enabled) {
+                    lockStore.setBiometricEnabled(false)
+                    result(false, "Biometric unlock disabled.")
+                } else requestBiometricEnable { success, message ->
+                    if (success) lockStore.setBiometricEnabled(true)
+                    result(success, message)
+                }
             }
         )
     } else if (gateState == GateState.WelcomeBack) {
@@ -814,7 +811,7 @@ private fun AppLockScreen(
                     }
                 }
             }
-            if (isSetup && biometricAvailable) {
+            if (isSetup) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                     verticalAlignment = Alignment.CenterVertically

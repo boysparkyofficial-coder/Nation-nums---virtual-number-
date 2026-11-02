@@ -58,12 +58,14 @@ jobs:
 
       - name: Export debug signing certificate fingerprint for Android App Links
         run: |
+          set -euo pipefail
           mkdir -p app/build/verification
           APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" /usr/local/lib/android/sdk /opt/android-sdk -type f -name apksigner 2>/dev/null | sort -V | tail -1)"
           if [ -z "$APKSIGNER" ]; then
             echo "Could not locate Android apksigner in the runner SDK."
             exit 1
           fi
+          echo "Using APK signer: $APKSIGNER"
           "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/verification/debug-certificate.txt 2>&1
           python3 - <<'PY'
           import re

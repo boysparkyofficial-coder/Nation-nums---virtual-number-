@@ -131,6 +131,8 @@ private val Green = Color(0xFF17845D)
 class MainActivity : FragmentActivity() {
     var shouldLockOnResume by mutableStateOf(false)
         private set
+    var resumeGeneration by mutableStateOf(0)
+        private set
     private var lastUserInteractionElapsed = android.os.SystemClock.elapsedRealtime()
 
     var notificationDestination by mutableStateOf<String?>(null)
@@ -153,7 +155,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // The relock flag is set whenever the app leaves the foreground.
+        // Notify Compose on every foreground return so biometric enrollment and relock
+        // state are refreshed after Android Settings or another app was opened.
+        resumeGeneration += 1
     }
 
     override fun onStop() {
@@ -272,8 +276,9 @@ private fun NationNumsApp(activity: MainActivity) {
     val sessionStore = remember { Base44SessionStore(activity) }
     var gateState by remember {
         mutableStateOf(
-            if (lockStore.isLockEnabled() && !sessionStore.readToken().isNullOrBlank())
-                GateState.Locked else GateState.Dashboard
+            if (!sessionStore.readToken().isNullOrBlank() && lockStore.isLockEnabled()) {
+                if (lockStore.isConfigured()) GateState.Locked else GateState.Setup
+            } else GateState.Dashboard
         )
     }
     var gateError by remember { mutableStateOf("") }
@@ -284,13 +289,16 @@ private fun NationNumsApp(activity: MainActivity) {
     ) }
     // Some Android devices expose secure fingerprint/face sensors as BIOMETRIC_WEAK.
     // Checking only BIOMETRIC_STRONG can incorrectly hide an enrolled biometric.
-    LaunchedEffect(activity.shouldLockOnResume) {
+    LaunchedEffect(activity.resumeGeneration) {
+        biometricAvailable = BiometricManager.from(activity).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
+        ) == BiometricManager.BIOMETRIC_SUCCESS
         if (activity.shouldLockOnResume) {
-            if (gateState == GateState.Dashboard &&
-                lockStore.isLockEnabled() && !sessionStore.readToken().isNullOrBlank()
+            if (lockStore.isLockEnabled() && !sessionStore.readToken().isNullOrBlank() &&
+                gateState != GateState.Setup && gateState != GateState.Locked
             ) {
-                gateState = GateState.Locked
                 gateError = ""
+                gateState = if (lockStore.isConfigured()) GateState.Locked else GateState.Setup
             }
             activity.clearRelockFlag()
         }
@@ -428,7 +436,7 @@ private fun NationNumsApp(activity: MainActivity) {
                 if (password.length < 4) {
                     gateError = "Choose an app password with at least 4 characters."
                 } else {
-                    lockStore.configurePassword(password, lockStore.isBiometricEnabled())
+                    lockStore.configurePassword(password, enableBiometric && biometricAvailable)
                     gateError = ""
                     gateState = GateState.Dashboard
                 }

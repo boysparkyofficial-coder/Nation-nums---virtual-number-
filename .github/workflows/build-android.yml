@@ -135,7 +135,7 @@ jobs:
                "-storepass", "android", "-alias", "androiddebugkey"],
               check=True, capture_output=True, text=True
           ).stdout
-          keystore_match = re.search(r"(?im)^\\s*SHA256:\\s*([0-9a-f:]{64,95})", keystore_output)
+          keystore_match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})", keystore_output)
           if not keystore_match:
               print(keystore_output)
               raise SystemExit("Could not parse the persistent keystore SHA-256 fingerprint.")

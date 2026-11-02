@@ -13,11 +13,23 @@ android {
         applicationId = "com.base44.nationnums"
         minSdk = 24
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.0.31"
+        versionCode = 22
+        versionName = "1.0.32"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }

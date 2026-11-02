@@ -54,6 +54,26 @@ jobs:
           fi
           keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
 
+      - name: Verify the approved Nation Nums signing key
+        run: |
+          set -euo pipefail
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey > /tmp/nation-nums-keystore.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path("/tmp/nation-nums-keystore.txt").read_text()
+          match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})", text)
+          if not match:
+              print(text)
+              raise SystemExit("Could not read the persistent keystore SHA-256 fingerprint.")
+          actual = re.sub(r"[^0-9a-f]", "", match.group(1)).upper()
+          expected = "22F53312092358D781F34E6BE466D1602DD48B81A8FE3CE621EF07B740C485CC"
+          if actual != expected:
+              formatted = ":".join(actual[i:i+2] for i in range(0, len(actual), 2))
+              raise SystemExit(f"Refusing to build: cached keystore fingerprint is {formatted}, not the approved Nation Nums certificate.")
+          print("Persistent keystore matches the approved Nation Nums signing certificate.")
+          PY
+
       - name: Download admin-managed logo, with safe build fallback
         run: |
           mkdir -p app/src/main/res/drawable-nodpi
@@ -79,10 +99,10 @@ jobs:
         run: gradle testDebugUnitTest
 
       - name: Build debug APK
-        run: gradle assembleDebug
+        run: gradle clean assembleDebug --no-build-cache
 
       - name: Build debug Android App Bundle
-        run: gradle bundleDebug
+        run: gradle bundleDebug --no-build-cache
 
       - name: Export debug signing certificate fingerprint for Android App Links
         run: |
@@ -97,18 +117,40 @@ jobs:
           "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/verification/debug-certificate.txt 2>&1
           python3 - <<'PY'
           import re
+          import subprocess
           from pathlib import Path
-          certificate_output = Path("app/build/verification/debug-certificate.txt").read_text()
-          match = re.search(r"(?i)certificate SHA-256 digest:\s*([0-9a-f:]{64,95})", certificate_output)
-          if not match:
-              print(certificate_output)
+
+          expected = "22F53312092358D781F34E6BE466D1602DD48B81A8FE3CE621EF07B740C485CC"
+
+          def normalize(value):
+              return re.sub(r"[^0-9a-f]", "", value).upper()
+
+          apk_output = Path("app/build/verification/debug-certificate.txt").read_text()
+          apk_match = re.search(r"(?i)certificate SHA-256 digest:\s*([0-9a-f:]{64,95})", apk_output)
+          if not apk_match:
+              print(apk_output)
               raise SystemExit("Could not parse the APK signing certificate SHA-256 fingerprint.")
-          fingerprint = re.sub(r"[^0-9a-f]", "", match.group(1)).upper()
-          if len(fingerprint) != 64:
-              raise SystemExit(f"Expected 64 SHA-256 hex characters, got {len(fingerprint)}.")
-          formatted = ":".join(fingerprint[i:i+2] for i in range(0, 64, 2))
+          apk_fingerprint = normalize(apk_match.group(1))
+
+          aab_output = subprocess.run(
+              ["keytool", "-printcert", "-jarfile", "app/build/outputs/bundle/debug/app-debug.aab"],
+              check=True, capture_output=True, text=True
+          ).stdout
+          aab_match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})", aab_output)
+          if not aab_match:
+              print(aab_output)
+              raise SystemExit("Could not parse the AAB signing certificate SHA-256 fingerprint.")
+          aab_fingerprint = normalize(aab_match.group(1))
+
+          if apk_fingerprint != expected or aab_fingerprint != expected:
+              raise SystemExit(
+                  "Refusing to upload APK/AAB: signing certificate mismatch. "
+                  f"APK={apk_fingerprint}, AAB={aab_fingerprint}, expected={expected}."
+              )
+
+          formatted = ":".join(apk_fingerprint[i:i+2] for i in range(0, 64, 2))
           Path("app/build/verification/debug-sha256.txt").write_text(formatted + "\n")
-          print("Debug signing certificate SHA-256:", formatted)
+          print("APK and AAB both match the approved Nation Nums signing certificate:", formatted)
           PY
 
       - name: Upload debug App Links fingerprint

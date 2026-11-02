@@ -18,6 +18,7 @@ internal fun NativeNumberPurchase(backend: Base44Api, usOnly: Boolean, modifier:
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var quote by remember { mutableStateOf<JSONObject?>(null) }
+    var search by remember(usOnly) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val serviceKey = if (usOnly) "us_number" else "sms_otp"
     fun selection() = JSONObject().put("country_code", country?.optString("country_code")).put("country", country?.optString("country")).put("flag", country?.optString("flag")).put("service", service).put("service_key", serviceKey).put("plan_type", "temporary")
@@ -30,16 +31,49 @@ internal fun NativeNumberPurchase(backend: Base44Api, usOnly: Boolean, modifier:
         busy = false
     }
     LazyColumn(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 30.dp)) {
-        item { TextButton(onClick = { when { service.isNotBlank() -> service = ""; country != null && !usOnly -> country = null; else -> onBack() } }, enabled = !busy) { Text("Back") }; Text(if (country == null) "Choose a country" else if (service.isBlank()) country!!.optString("country") + " services" else service + " — live offers", style = MaterialTheme.typography.headlineSmall) }
+        item {
+            TextButton(onClick = {
+                when {
+                    service.isNotBlank() -> { service = ""; search = "" }
+                    country != null && !usOnly -> { country = null; search = "" }
+                    else -> onBack()
+                }
+            }, enabled = !busy) { Text("Back") }
+            Text(
+                if (country == null) "Choose a country" else if (service.isBlank()) country!!.optString("country") + " services" else service + " — live offers",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        }
+        if (country == null || service.isBlank()) item {
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it },
+                label = { Text(if (country == null) "Search countries" else "Search services") },
+                singleLine = true,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         if (error.isNotBlank()) item { Text(error, color = MaterialTheme.colorScheme.error); TextButton(onClick = { onBack() }) { Text("Return and try again") } }
         if (!busy && error.isBlank() && options.isEmpty()) item { Text("No services are available for this selection right now.") }
-        items(options) { option ->
+        val visibleOptions = options.filter { option ->
+            val searchable = when {
+                country == null -> listOf(option.optString("country"), option.optString("country_code"), option.optString("name"))
+                service.isBlank() -> listOf(option.optString("service"), option.optString("label"), option.optString("name"))
+                else -> listOf(option.optString("label"), option.optString("server_name"), option.optString("price"))
+            }.joinToString(" ")
+            searchable.contains(search.trim(), ignoreCase = true)
+        }
+        if (!busy && error.isBlank() && visibleOptions.isEmpty() && options.isNotEmpty()) item {
+            Text(if (country == null) "No countries match your search." else "No services match your search.")
+        }
+        items(visibleOptions) { option ->
             val available = service.isBlank() || (option.optBoolean("available") && option.optDouble("price", 0.0) > 0)
             OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !busy && available, onClick = {
                 when {
-                    country == null -> country = option
-                    service.isBlank() -> service = option.optString("service")
+                    country == null -> { country = option; search = "" }
+                    service.isBlank() -> { service = option.optString("service"); search = "" }
                     else -> scope.launch {
                         busy = true; error = ""
                         val result = backend.awaitFunction("getPurchasePrice", selection().put("server_id", option.optString("server_id")))

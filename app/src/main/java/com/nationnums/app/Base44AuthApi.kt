@@ -35,22 +35,29 @@ internal class Base44SessionStore(context: Context) {
         require(cleanToken.isNotBlank() && !cleanToken.equals("null", ignoreCase = true)) {
             "Cannot store an empty or invalid session token."
         }
-        if (!rememberMe) {
-            clearPersistedToken()
-            transientToken = cleanToken
-            return
-        }
-        // Persist successfully before publishing the in-memory session. If encryption
-        // fails, the caller must not observe a partially established login session.
-        val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
-        val encrypted = cipher.doFinal(cleanToken.toByteArray(StandardCharsets.UTF_8))
-        prefs.edit()
-            .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
-            .putString(KEY_TOKEN, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .apply()
+        // Publish the authenticated session in memory first so a device-specific
+        // Android Keystore failure can never turn a valid server login into a failed login.
         transientToken = cleanToken
+        clearPersistedToken()
+        if (!rememberMe) return
+
+        // Remember Me uses encrypted Android Keystore storage. Some Android devices
+        // reject key creation or encryption; keep the current session usable in memory
+        // and let the user sign in again next time rather than blocking this login.
+        try {
+            val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
+            val encrypted = cipher.doFinal(cleanToken.toByteArray(StandardCharsets.UTF_8))
+            val saved = prefs.edit()
+                .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
+                .putString(KEY_TOKEN, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .commit()
+            if (!saved) clearPersistedToken()
+        } catch (_: Exception) {
+            // A persistent-session failure is not an authentication failure.
+            clearPersistedToken()
+        }
     }
 
     @Synchronized

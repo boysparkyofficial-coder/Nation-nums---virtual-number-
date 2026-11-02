@@ -51,3 +51,11 @@ Admin/provider credentials and admin-only operations are never embedded in the A
 
 ## Website feature parity — 1.0.26
 The native dashboard and service directory are aligned with the current Nation Nums website catalogue. Proxy browsing uses the same live catalogue facets and quote/purchase functions as the website, including an explicit second confirmation if the supplier price changes. Social Media Logs supports provider categories, search, paging, stock-aware availability and idempotent purchase requests; delivered social orders can be sent to the customer's verified WhatsApp from order history. Nigerian VTU is displayed as Coming soon and accepts no payment until a verified provider contract is connected. No supplier credentials or direct wallet writes are included in the APK.
+
+
+## Android App Links and app reauthentication — 1.0.33
+- Returning to the app after it leaves the foreground requires the configured app biometric or the Nation Nums app passcode.
+- The biometric prompt's fallback is the app passcode on all supported Android versions; it does not substitute the phone's unrelated screen-lock PIN.
+- After successful unlock, the app displays the signed-in user's welcome-back screen.
+- The Android manifest verifies HTTPS links for `nation-nums.base44.app`. Publish `docs/assetlinks.json` at `https://nation-nums.base44.app/.well-known/assetlinks.json` on the website host to complete Android domain verification.
+- The build restores the latest successful signing-key cache and fails closed if that key is unavailable or its SHA-256 certificate fingerprint differs from the fingerprint from successful build #171. It must never generate a replacement signing identity. It restores the exact key used by successful build #171.

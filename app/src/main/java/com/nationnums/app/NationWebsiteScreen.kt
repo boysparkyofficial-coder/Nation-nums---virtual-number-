@@ -181,6 +181,11 @@ internal fun NationWebsiteScreen(
                         override fun onPageFinished(view: WebView?, url: String?) {
                             progress = 100
                             pageLoaded = url?.startsWith(NATION_SITE) == true
+                            // Let the first-party website distinguish the installed native app
+                            // from a normal browser and suppress its app-download promotion.
+                            if (pageLoaded) {
+                                view?.evaluateJavascript("window.__NATION_NUMS_NATIVE_APP__ = true; document.documentElement.setAttribute('data-nation-native-app', 'true');", null)
+                            }
                             canGoBack = view?.canGoBack() == true
                         }
 

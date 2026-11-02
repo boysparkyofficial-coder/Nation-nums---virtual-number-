@@ -400,22 +400,15 @@ private fun NationNumsApp(activity: MainActivity) {
                 }
             }
         )
-        val promptBuilder = BiometricPrompt.PromptInfo.Builder()
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Nation Nums")
             .setSubtitle("Confirm it's you to open the app")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ can securely fall back to the device's enrolled PIN,
-            // pattern or password. Older Android versions retain the app-passcode
-            // fallback shown by AppLockScreen.
-            promptBuilder.setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            )
-        } else {
-            promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-            promptBuilder.setNegativeButtonText("Use app password")
-        }
-        prompt.authenticate(promptBuilder.build())
+            // Keep fallback consistent on every Android version: users enter
+            // their Nation Nums app passcode, not the phone's unrelated device PIN.
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+            .setNegativeButtonText("Use app passcode")
+            .build()
+        prompt.authenticate(promptInfo)
     }
 
     // Offer biometric unlock automatically whenever the configured app lock is shown.

@@ -38,44 +38,14 @@ jobs:
           path: ~/.android/debug.keystore
           key: nation-nums-debug-signing-keystore-v1
 
-      - name: Ensure debug signing key exists
-        run: |
-          mkdir -p "$HOME/.android"
-          if [ ! -f "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair -v -noprompt \
-              -keystore "$HOME/.android/debug.keystore" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
-
-      - name: Verify the approved Nation Nums signing key
+      - name: Verify signing key is present (never generate a replacement)
         run: |
           set -euo pipefail
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey > /tmp/nation-nums-keystore.txt
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-          text = Path("/tmp/nation-nums-keystore.txt").read_text()
-          print("Persistent keystore certificate details:")
-          print(text)
-          match = re.search(r"(?is)SHA256:\s*((?:[0-9a-f]{2}[:\s]?){32})", text)
-          if not match:
-              raise SystemExit("Could not read a complete persistent keystore SHA-256 fingerprint.")
-          actual = re.sub(r"[^0-9a-f]", "", match.group(1)).upper()
-          expected = "22F53312092358D781F34E6BE466D1602DD48B81A8FE3CE621EF07B740C485CC"
-          if len(actual) != 64:
-              raise SystemExit(f"Persistent keystore fingerprint has {len(actual)} hex characters, expected 64.")
-          if actual != expected:
-              formatted = ":".join(actual[i:i+2] for i in range(0, 64, 2))
-              raise SystemExit(f"Refusing to build: cached keystore fingerprint is {formatted}, not the approved Nation Nums certificate.")
-          print("Persistent keystore matches the approved Nation Nums signing certificate.")
-          PY
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            echo "Refusing to generate a replacement signing key. Restore the original approved Nation Nums keystore."
+            exit 1
+          fi
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
 
       - name: Download admin-managed logo, with safe build fallback
         run: |
@@ -106,6 +76,29 @@ jobs:
 
       - name: Build debug Android App Bundle
         run: gradle bundleDebug --no-build-cache
+
+      - name: Verify the approved Nation Nums signing key
+        run: |
+          set -euo pipefail
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey > /tmp/nation-nums-keystore.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path("/tmp/nation-nums-keystore.txt").read_text()
+          print("Persistent keystore certificate details:")
+          print(text)
+          match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})\s*$", text)
+          if not match:
+              raise SystemExit("Could not read a complete persistent keystore SHA-256 fingerprint.")
+          actual = re.sub(r"[^0-9a-f]", "", match.group(1)).upper()
+          expected = "22F53312092358D781F34E6BE466D1602DD48B81A8FE3CE621EF07B740C485CC"
+          if len(actual) != 64:
+              raise SystemExit(f"Persistent keystore fingerprint has {len(actual)} hex characters, expected 64.")
+          if actual != expected:
+              formatted = ":".join(actual[i:i+2] for i in range(0, 64, 2))
+              raise SystemExit(f"Refusing to build: cached keystore fingerprint is {formatted}, not the approved Nation Nums certificate.")
+          print("Persistent keystore matches the approved Nation Nums signing certificate.")
+          PY
 
       - name: Export debug signing certificate fingerprint for Android App Links
         run: |

@@ -456,8 +456,8 @@ private fun NationNumsApp(activity: MainActivity) {
             biometricEnabled = lockStore.isBiometricEnabled(),
             errorMessage = gateError,
             onCreatePassword = { password, enableBiometric ->
-                if (password.length < 4) {
-                    gateError = "Choose an app password with at least 4 characters."
+                if (password.length != 5 || password.any { !it.isDigit() }) {
+                    gateError = "Choose a 5-digit numeric app passcode."
                 } else {
                     lockStore.configurePassword(password, enableBiometric && biometricAvailable)
                     gateError = ""

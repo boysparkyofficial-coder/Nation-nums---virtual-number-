@@ -371,7 +371,17 @@ private fun NationNumsApp(activity: MainActivity) {
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
             .setNegativeButtonText("Cancel")
             .build()
-        prompt.authenticate(info)
+        activity.window.decorView.post {
+            if (!activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                onResult(false, "Please keep Nation Nums open and try enabling biometric unlock again.")
+                return@post
+            }
+            try {
+                prompt.authenticate(info)
+            } catch (error: Exception) {
+                onResult(false, "Could not start biometric verification: ${error.localizedMessage ?: "Please try again."}")
+            }
+        }
     }
 
     var biometricPromptActive by remember { mutableStateOf(false) }
@@ -446,11 +456,18 @@ private fun NationNumsApp(activity: MainActivity) {
         }
     }
 
-    // Offer biometric unlock automatically whenever the configured app lock is shown.
-    // The passcode keypad remains available if the user cancels or biometric fails.
-    LaunchedEffect(gateState, biometricAvailable, lockStore.isBiometricEnabled()) {
+    // Re-attempt biometric unlock after every foreground return. A prompt request can
+    // arrive just before FragmentActivity reaches RESUMED; in that case the first request
+    // is intentionally skipped, so resumeGeneration must trigger a fresh attempt.
+    LaunchedEffect(
+        activity.resumeGeneration,
+        gateState,
+        biometricAvailable,
+        lockStore.isBiometricEnabled()
+    ) {
         if (gateState == GateState.Locked && biometricAvailable && lockStore.isBiometricEnabled()) {
-            promptBiometric()
+            kotlinx.coroutines.delay(350)
+            if (gateState == GateState.Locked) promptBiometric()
         }
     }
 

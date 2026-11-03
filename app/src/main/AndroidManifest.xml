@@ -5,11 +5,15 @@
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
+        android:name=".NationNumsApplication"
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher_logo"
         android:label="Nation Nums"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-5510521281550715~8212510040" />
         <service
             android:name=".NationNumsFirebaseMessagingService"
             android:exported="false">

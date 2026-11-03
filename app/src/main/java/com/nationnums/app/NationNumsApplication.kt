@@ -7,10 +7,11 @@ import android.os.SystemClock
 import android.util.Log
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
-import com.google.android.libraries.ads.mobile.sdk.adpreloading.PreloadConfiguration
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadConfiguration
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdPreloader
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.ExperimentalApi
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ import kotlinx.coroutines.launch
  * AdMob App Open integration. Ads are preloaded in the background and are only
  * displayed when the authenticated app UI explicitly reports that it is safe.
  */
+@OptIn(ExperimentalApi::class)
 class NationNumsApplication : Application() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -98,7 +100,7 @@ class NationNumsApplication : Application() {
 
         // Google's official App Open test unit. Replace with the supplied production
         // unit only in the release configuration after test verification.
-        private const val APP_OPEN_AD_UNIT_ID = "ca-app-pub-3940256099942544/9257395921"
+        private const val APP_OPEN_AD_UNIT_ID = "/6499/example/app-open"
         private const val ADMOB_APP_ID = "ca-app-pub-5510521281550715~8212510040"
     }
 }

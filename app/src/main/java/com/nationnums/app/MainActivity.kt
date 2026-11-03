@@ -138,6 +138,14 @@ class MainActivity : FragmentActivity() {
     var resumeGeneration by mutableStateOf(0)
         private set
     private var lastUserInteractionElapsed = android.os.SystemClock.elapsedRealtime()
+    private var suppressNextAppOpenAd = false
+
+    fun markExternalNavigation() { suppressNextAppOpenAd = true }
+    fun consumeAppOpenAdSuppression(): Boolean {
+        val suppress = suppressNextAppOpenAd
+        suppressNextAppOpenAd = false
+        return suppress
+    }
 
     var notificationDestination by mutableStateOf<String?>(null)
         private set
@@ -306,6 +314,17 @@ private fun NationNumsApp(activity: MainActivity) {
                 gateState = if (lockStore.isConfigured()) GateState.Locked else GateState.Setup
             }
             activity.clearRelockFlag()
+        }
+    }
+
+    // App Open ads are attempted only after the secure app gate has been passed.
+    // The manager applies a first-use delay and a conservative four-hour frequency cap.
+    LaunchedEffect(gateState, activity.resumeGeneration) {
+        if (gateState == GateState.Dashboard) {
+            kotlinx.coroutines.delay(900)
+            if (!activity.consumeAppOpenAdSuppression() && gateState == GateState.Dashboard) {
+                (activity.application as? NationNumsApplication)?.showAppOpenAdIfEligible(activity)
+            }
         }
     }
 

@@ -322,7 +322,7 @@ private fun NationNumsApp(activity: MainActivity) {
         }
     }
 
-    fun gateState = GateState.Dashboard {
+    fun showWelcomeBack() {
         welcomeUsername = ""
         gateState = GateState.WelcomeBack
         Base44AuthApi(sessionStore).currentUser { result ->

@@ -78,6 +78,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,6 +105,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val NationBlue = Color(0xFF145DDB)
 private val Ink = Color(0xFF14213D)
@@ -274,6 +278,7 @@ private enum class GateState { Setup, Locked, WelcomeBack, Dashboard }
 private fun NationNumsApp(activity: MainActivity) {
     val lockStore = remember { AppLockStore(activity) }
     val sessionStore = remember { Base44SessionStore(activity) }
+    val appScope = rememberCoroutineScope()
     var gateState by remember {
         mutableStateOf(
             if (!sessionStore.readToken().isNullOrBlank() && lockStore.isLockEnabled()) {
@@ -459,24 +464,37 @@ private fun NationNumsApp(activity: MainActivity) {
                 if (password.length != 5 || password.any { !it.isDigit() }) {
                     gateError = "Choose a 5-digit numeric app passcode."
                 } else {
-                    lockStore.configurePassword(password, enableBiometric && biometricAvailable)
-                    gateError = ""
-                    gateState = GateState.Dashboard
+                    appScope.launch {
+                        // PBKDF2 is deliberately moved off Android's UI thread. On slower
+                        // phones, doing 120,000 hash iterations on the main thread can freeze
+                        // the activity and trigger "Nation Nums isn't responding".
+                        withContext(Dispatchers.Default) {
+                            lockStore.configurePassword(password, enableBiometric && biometricAvailable)
+                        }
+                        gateError = ""
+                        gateState = GateState.Dashboard
+                    }
                 }
             },
             onUnlockPassword = { password ->
-                if (lockStore.isLockedOut()) {
-                    gateError = "Too many incorrect attempts. Try again in ${lockStore.remainingLockoutSeconds()} seconds."
-                } else if (password.length == 5 && password.all { it.isDigit() } && lockStore.verifyPassword(password)) {
-                    lockStore.clearFailedAttempts()
-                    gateError = ""
-                    showWelcomeBack()
-                } else {
-                    val attemptsRemaining = lockStore.recordFailedAttempt()
-                    gateError = if (attemptsRemaining <= 0) {
-                        "Too many incorrect attempts. App unlock is paused for 30 seconds."
+                appScope.launch {
+                    if (lockStore.isLockedOut()) {
+                        gateError = "Too many incorrect attempts. Try again in ${lockStore.remainingLockoutSeconds()} seconds."
                     } else {
-                        "Incorrect passcode. ${attemptsRemaining} attempt(s) left before a short lockout."
+                        val valid = password.length == 5 && password.all { it.isDigit() } &&
+                            withContext(Dispatchers.Default) { lockStore.verifyPassword(password) }
+                        if (valid) {
+                            lockStore.clearFailedAttempts()
+                            gateError = ""
+                            showWelcomeBack()
+                        } else {
+                            val attemptsRemaining = lockStore.recordFailedAttempt()
+                            gateError = if (attemptsRemaining <= 0) {
+                                "Too many incorrect attempts. App unlock is paused for 30 seconds."
+                            } else {
+                                "Incorrect passcode. ${attemptsRemaining} attempt(s) left before a short lockout."
+                            }
+                        }
                     }
                 }
             },

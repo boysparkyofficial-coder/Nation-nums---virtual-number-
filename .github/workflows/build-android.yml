@@ -1,6 +1,7 @@
 name: Build Nation Nums Android APK
 
 on:
+  # Include the AdMob feature branch so its APK/AAB can be built and verified.
   push:
     branches: [main, fix/biometric-lock-welcome-back, feature/admob-app-open]
   workflow_dispatch:

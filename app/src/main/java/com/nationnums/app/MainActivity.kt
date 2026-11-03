@@ -369,46 +369,76 @@ private fun NationNumsApp(activity: MainActivity) {
         prompt.authenticate(info)
     }
 
+    var biometricPromptActive by remember { mutableStateOf(false) }
+
     fun promptBiometric() {
-        if (!biometricAvailable || !lockStore.isBiometricEnabled()) {
-            gateError = "Biometric unlock is not available. Use your app password."
+        if (biometricPromptActive) return
+        val manager = BiometricManager.from(activity)
+        val availability = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+        if (!lockStore.isBiometricEnabled() || availability != BiometricManager.BIOMETRIC_SUCCESS) {
+            biometricAvailable = availability == BiometricManager.BIOMETRIC_SUCCESS
+            gateError = when (availability) {
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+                    "No fingerprint or face is enrolled on this phone. Enrol biometrics in Android Settings, then enable biometric unlock again."
+                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ->
+                    "This phone does not have supported biometric hardware. Use your 5-digit app passcode."
+                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
+                    "The biometric sensor is temporarily unavailable. Use your 5-digit app passcode."
+                else -> "Biometric unlock is not enabled. Use your 5-digit app passcode."
+            }
             return
         }
-        val prompt = BiometricPrompt(
-            activity,
-            ContextCompat.getMainExecutor(activity),
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    gateError = ""
-                    showWelcomeBack()
-                }
 
-                override fun onAuthenticationFailed() {
-                    super.onAuthenticationFailed()
-                    gateError = "Biometric not recognised. Try again or use your app password."
-                }
+        // BiometricPrompt must be started while the FragmentActivity is RESUMED.
+        // Posting to the decor view avoids racing Compose's first composition/activity resume.
+        activity.window.decorView.post {
+            if (!activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) ||
+                gateState != GateState.Locked || biometricPromptActive
+            ) return@post
 
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                    if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
-                        errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
-                        errorCode != BiometricPrompt.ERROR_CANCELED
-                    ) {
-                        gateError = errString.toString()
+            biometricPromptActive = true
+            try {
+                val prompt = BiometricPrompt(
+                    activity,
+                    ContextCompat.getMainExecutor(activity),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        private fun finishPrompt() { biometricPromptActive = false }
+
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            super.onAuthenticationSucceeded(result)
+                            finishPrompt()
+                            gateError = ""
+                            lockStore.clearFailedAttempts()
+                            showWelcomeBack()
+                        }
+
+                        override fun onAuthenticationFailed() {
+                            super.onAuthenticationFailed()
+                            gateError = "Fingerprint not recognised. Try again or enter your 5-digit app passcode."
+                        }
+
+                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                            super.onAuthenticationError(errorCode, errString)
+                            finishPrompt()
+                            if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                                errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                                errorCode != BiometricPrompt.ERROR_CANCELED
+                            ) gateError = "Biometric unlock could not start: $errString"
+                        }
                     }
-                }
+                )
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("Unlock Nation Nums")
+                    .setSubtitle("Confirm it's you to open the app")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                    .setNegativeButtonText("Use app passcode")
+                    .build()
+                prompt.authenticate(promptInfo)
+            } catch (error: Exception) {
+                biometricPromptActive = false
+                gateError = "Unable to open biometric authentication: ${error.localizedMessage ?: "Please use your app passcode."}"
             }
-        )
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Nation Nums")
-            .setSubtitle("Confirm it's you to open the app")
-            // Keep fallback consistent on every Android version: users enter
-            // their Nation Nums app passcode, not the phone's unrelated device PIN.
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-            .setNegativeButtonText("Use app passcode")
-            .build()
-        prompt.authenticate(promptInfo)
+        }
     }
 
     // Offer biometric unlock automatically whenever the configured app lock is shown.
@@ -437,7 +467,7 @@ private fun NationNumsApp(activity: MainActivity) {
             onUnlockPassword = { password ->
                 if (lockStore.isLockedOut()) {
                     gateError = "Too many incorrect attempts. Try again in ${lockStore.remainingLockoutSeconds()} seconds."
-                } else if (lockStore.verifyPassword(password)) {
+                } else if (password.length == 5 && password.all { it.isDigit() } && lockStore.verifyPassword(password)) {
                     lockStore.clearFailedAttempts()
                     gateError = ""
                     showWelcomeBack()

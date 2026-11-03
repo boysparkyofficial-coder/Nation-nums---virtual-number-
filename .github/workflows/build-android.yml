@@ -2,7 +2,7 @@ name: Build Nation Nums Android APK
 
 on:
   push:
-    branches: [main, fix/biometric-lock-welcome-back]
+    branches: [main, fix/biometric-lock-welcome-back, feature/admob-app-open]
   workflow_dispatch:
 
 concurrency:

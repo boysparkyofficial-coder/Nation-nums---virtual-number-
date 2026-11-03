@@ -193,11 +193,11 @@ internal fun NationWebsiteScreen(
                             val uri = request?.url ?: return true
                             if (uri.scheme.equals("https", true) && uri.host.equals("nation-nums.base44.app", true)) return false
                             if (uri.scheme.equals("https", true) && uri.host.equals("accounts.google.com", true)) {
-                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                                runCatching { activity.markExternalNavigation(); activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                                 return true
                             }
                             if (uri.scheme.equals("https", true) || uri.scheme.equals("mailto", true) || uri.scheme.equals("tel", true)) {
-                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                                runCatching { activity.markExternalNavigation(); activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                                 return true
                             }
                             return true

@@ -322,7 +322,7 @@ private fun NationNumsApp(activity: MainActivity) {
         }
     }
 
-    fun showWelcomeBack() {
+    fun gateState = GateState.Dashboard {
         welcomeUsername = ""
         gateState = GateState.WelcomeBack
         Base44AuthApi(sessionStore).currentUser { result ->
@@ -424,7 +424,7 @@ private fun NationNumsApp(activity: MainActivity) {
                             finishPrompt()
                             gateError = ""
                             lockStore.clearFailedAttempts()
-                            showWelcomeBack()
+                            gateState = GateState.Dashboard
                         }
 
                         override fun onAuthenticationFailed() {
@@ -503,7 +503,7 @@ private fun NationNumsApp(activity: MainActivity) {
                         if (valid) {
                             lockStore.clearFailedAttempts()
                             gateError = ""
-                            showWelcomeBack()
+                            gateState = GateState.Dashboard
                         } else {
                             val attemptsRemaining = lockStore.recordFailedAttempt()
                             gateError = if (attemptsRemaining <= 0) {

@@ -8,10 +8,10 @@ import android.util.Log
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import com.google.android.libraries.ads.mobile.sdk.adpreloading.PreloadConfiguration
-import com.google.android.libraries.ads.mobile.sdk.adpreloading.AppOpenAdPreloader
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdPreloader
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
-import com.google.android.libraries.ads.mobile.sdk.adformats.appopen.AppOpenAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

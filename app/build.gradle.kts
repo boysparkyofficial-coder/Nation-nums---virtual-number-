@@ -50,6 +50,8 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-messaging")
+    // Google Mobile Ads Next-Gen SDK (preferred Android SDK).
+    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.3.1")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.activity:activity-compose:1.9.3")

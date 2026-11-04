@@ -30,17 +30,6 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      # Keep one debug signing identity across builds so installed APKs can update
-      # and the App Links fingerprint remains stable. This repo is private.
-      # Restore the original signing identity used by established Nation Nums builds.
-      # Fail closed if it is unavailable; never generate or rotate a signing key.
-      - name: Restore original Nation Nums signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: nation-nums-debug-signing-keystore-v3
-          fail-on-cache-miss: true
-
       - name: Download admin-managed logo, with safe build fallback
         run: |
           mkdir -p app/src/main/res/drawable-nodpi
@@ -64,102 +53,6 @@ jobs:
 
       - name: Run local unit tests
         run: gradle testDebugUnitTest
-
-      - name: Build debug APK
-        run: gradle clean assembleDebug --no-build-cache
-
-      - name: Build debug Android App Bundle
-        run: gradle bundleDebug --no-build-cache
-
-      # Sign the AAB explicitly; the current Gradle debug bundle output is unsigned.
-      - name: Sign debug App Bundle with the persistent Nation Nums key
-        run: |
-          set -euo pipefail
-          jarsigner -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -digestalg SHA-256 -sigalg SHA256withRSA app/build/outputs/bundle/debug/app-debug.aab androiddebugkey
-          jarsigner -verify -certs app/build/outputs/bundle/debug/app-debug.aab
-
-      - name: Verify the approved Nation Nums signing key
-        run: |
-          set -euo pipefail
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey > /tmp/nation-nums-keystore.txt
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-          text = Path("/tmp/nation-nums-keystore.txt").read_text()
-          print("Persistent keystore certificate details:")
-          print(text)
-          match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})\s*$", text)
-          if not match:
-              raise SystemExit("Could not read a complete persistent keystore SHA-256 fingerprint.")
-          actual = re.sub(r"[^0-9A-Fa-f]", "", match.group(1)).upper()
-          expected = "3A4F2802710D775473424494527648B6044D3B500166B2EF4A68881360CCF96A"
-          if len(actual) != 64:
-              raise SystemExit(f"Persistent keystore fingerprint has {len(actual)} hex characters, expected 64.")
-          if actual != expected:
-              raise SystemExit(
-                  "Signing identity mismatch. Refusing to build with a different Nation Nums certificate."
-              )
-          formatted = ":".join(actual[i:i+2] for i in range(0, 64, 2))
-          print("Verified original Nation Nums signing certificate:", formatted)
-          PY
-
-      - name: Export debug signing certificate fingerprint for Android App Links
-        run: |
-          set -euo pipefail
-          mkdir -p app/build/verification
-          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" /usr/local/lib/android/sdk /opt/android-sdk -type f -name apksigner 2>/dev/null | sort -V | tail -1 || true)"
-          if [ -z "$APKSIGNER" ]; then
-            echo "Could not locate Android apksigner in the runner SDK."
-            exit 1
-          fi
-          echo "Using APK signer: $APKSIGNER"
-          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/verification/debug-certificate.txt 2>&1
-          python3 - <<'PY'
-          import re
-          import subprocess
-          from pathlib import Path
-
-          keystore_output = subprocess.run(
-              ["keytool", "-list", "-v", "-keystore", str(Path.home() / ".android/debug.keystore"),
-               "-storepass", "android", "-alias", "androiddebugkey"],
-              check=True, capture_output=True, text=True
-          ).stdout
-          keystore_match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})", keystore_output)
-          if not keystore_match:
-              print(keystore_output)
-              raise SystemExit("Could not parse the persistent keystore SHA-256 fingerprint.")
-          expected = re.sub(r"[^0-9A-Fa-f]", "", keystore_match.group(1)).upper()
-
-          def normalize(value):
-              return re.sub(r"[^0-9A-Fa-f]", "", value).upper()
-
-          apk_output = Path("app/build/verification/debug-certificate.txt").read_text()
-          apk_match = re.search(r"(?i)certificate SHA-256 digest:\s*([0-9a-f:]{64,95})", apk_output)
-          if not apk_match:
-              print(apk_output)
-              raise SystemExit("Could not parse the APK signing certificate SHA-256 fingerprint.")
-          apk_fingerprint = normalize(apk_match.group(1))
-
-          aab_output = subprocess.run(
-              ["keytool", "-printcert", "-jarfile", "app/build/outputs/bundle/debug/app-debug.aab"],
-              check=True, capture_output=True, text=True
-          ).stdout
-          aab_match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})", aab_output)
-          if not aab_match:
-              print(aab_output)
-              raise SystemExit("Could not parse the AAB signing certificate SHA-256 fingerprint.")
-          aab_fingerprint = normalize(aab_match.group(1))
-
-          if len(expected) != 64 or apk_fingerprint != expected or aab_fingerprint != expected:
-              raise SystemExit(
-                  "Refusing to upload APK/AAB: signing certificate mismatch. "
-                  f"APK={apk_fingerprint}, AAB={aab_fingerprint}, keystore={expected}."
-              )
-
-          formatted = ":".join(apk_fingerprint[i:i+2] for i in range(0, 64, 2))
-          Path("app/build/verification/debug-sha256.txt").write_text(formatted + "\n")
-          print("APK and AAB both match the approved Nation Nums signing certificate:", formatted)
-          PY
 
       - name: Restore production release keystore from GitHub secret
         env:
@@ -240,25 +133,4 @@ jobs:
         with:
           name: nation-nums-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
-
-      - name: Upload debug App Links fingerprint
-        uses: actions/upload-artifact@v6
-        with:
-          name: nation-nums-app-links-fingerprint
-          path: app/build/verification/debug-sha256.txt
-          if-no-files-found: error
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v6
-        with:
-          name: nation-nums-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
-      - name: Upload Android App Bundle
-        uses: actions/upload-artifact@v6
-        with:
-          name: nation-nums-debug-aab
-          path: app/build/outputs/bundle/debug/app-debug.aab
           if-no-files-found: error

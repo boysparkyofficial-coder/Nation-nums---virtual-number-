@@ -58,6 +58,8 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.3")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.activity:activity-compose:1.9.3")

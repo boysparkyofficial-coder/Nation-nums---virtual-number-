@@ -83,11 +83,11 @@ jobs:
           import re
           from pathlib import Path
           output = Path("/tmp/nation-nums-release-cert.txt").read_text()
-          match = re.search(r"(?im)^\\s*SHA256:\\s*([0-9a-f:]{64,95})\\s*$", output)
+          match = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})\s*$", output)
           if not match:
               raise SystemExit("Could not read release keystore SHA-256 fingerprint.")
           actual = re.sub(r"[^0-9A-Fa-f]", "", match.group(1)).upper()
-          expected = "B6CA57BBF074562599E3202C9A39071E02419057318BC32A840A824DE2DD7B5A"
+          expected = "4322C6E9DEB57E72809812D760FF156FCCA0667C7742739B389CEAF662D2E65D"
           if actual != expected:
               raise SystemExit("Release keystore fingerprint differs from the prepared Nation Nums release key.")
           print("Verified Nation Nums release certificate:", ":".join(actual[i:i+2] for i in range(0, 64, 2)))
@@ -107,11 +107,11 @@ jobs:
           python3 - <<'PY'
           import re
           from pathlib import Path
-          expected = "B6CA57BBF074562599E3202C9A39071E02419057318BC32A840A824DE2DD7B5A"
+          expected = "4322C6E9DEB57E72809812D760FF156FCCA0667C7742739B389CEAF662D2E65D"
           apk = Path("app/build/verification/release-apk-certificate.txt").read_text()
           aab = Path("app/build/verification/release-aab-certificate.txt").read_text()
-          am = re.search(r"(?i)certificate SHA-256 digest:\\s*([0-9a-f:]{64,95})", apk)
-          bm = re.search(r"(?im)^\\s*SHA256:\\s*([0-9a-f:]{64,95})", aab)
+          am = re.search(r"(?i)certificate SHA-256 digest:\s*([0-9a-f:]{64,95})", apk)
+          bm = re.search(r"(?im)^\s*SHA256:\s*([0-9a-f:]{64,95})", aab)
           if not am or not bm:
               raise SystemExit("Could not extract both release signing fingerprints.")
           norm = lambda s: re.sub(r"[^0-9A-Fa-f]", "", s).upper()

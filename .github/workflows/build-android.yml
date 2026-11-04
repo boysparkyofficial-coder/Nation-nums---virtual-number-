@@ -161,6 +161,87 @@ jobs:
           print("APK and AAB both match the approved Nation Nums signing certificate:", formatted)
           PY
 
+      - name: Restore production release keystore from GitHub secret
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_KEYSTORE_BASE64"
+          test -n "$RELEASE_KEYSTORE_PASSWORD"
+          test -n "$RELEASE_KEY_ALIAS"
+          test -n "$RELEASE_KEY_PASSWORD"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nation-nums-release.jks"
+          chmod 600 "$RUNNER_TEMP/nation-nums-release.jks"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/nation-nums-release.jks" >> "$GITHUB_ENV"
+          echo "RELEASE_KEYSTORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
+          keytool -list -keystore "$RUNNER_TEMP/nation-nums-release.jks" -storepass "$RELEASE_KEYSTORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" >/dev/null
+          echo "Production keystore restored and alias validated."
+
+      - name: Verify production release certificate identity
+        run: |
+          set -euo pipefail
+          keytool -list -v -keystore "$RELEASE_KEYSTORE_PATH" -storepass "$RELEASE_KEYSTORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" > /tmp/nation-nums-release-cert.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          output = Path("/tmp/nation-nums-release-cert.txt").read_text()
+          match = re.search(r"(?im)^\\s*SHA256:\\s*([0-9a-f:]{64,95})\\s*$", output)
+          if not match:
+              raise SystemExit("Could not read release keystore SHA-256 fingerprint.")
+          actual = re.sub(r"[^0-9A-Fa-f]", "", match.group(1)).upper()
+          expected = "B6CA57BBF074562599E3202C9A39071E02419057318BC32A840A824DE2DD7B5A"
+          if actual != expected:
+              raise SystemExit("Release keystore fingerprint differs from the prepared Nation Nums release key.")
+          print("Verified Nation Nums release certificate:", ":".join(actual[i:i+2] for i in range(0, 64, 2)))
+          PY
+
+      - name: Build signed release APK and AAB
+        run: gradle assembleRelease bundleRelease --no-build-cache
+
+      - name: Verify release APK and AAB signatures
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" /usr/local/lib/android/sdk /opt/android-sdk -type f -name apksigner 2>/dev/null | sort -V | tail -1 || true)"
+          test -n "$APKSIGNER"
+          mkdir -p app/build/verification
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk > app/build/verification/release-apk-certificate.txt 2>&1
+          keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab > app/build/verification/release-aab-certificate.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          expected = "B6CA57BBF074562599E3202C9A39071E02419057318BC32A840A824DE2DD7B5A"
+          apk = Path("app/build/verification/release-apk-certificate.txt").read_text()
+          aab = Path("app/build/verification/release-aab-certificate.txt").read_text()
+          am = re.search(r"(?i)certificate SHA-256 digest:\\s*([0-9a-f:]{64,95})", apk)
+          bm = re.search(r"(?im)^\\s*SHA256:\\s*([0-9a-f:]{64,95})", aab)
+          if not am or not bm:
+              raise SystemExit("Could not extract both release signing fingerprints.")
+          norm = lambda s: re.sub(r"[^0-9A-Fa-f]", "", s).upper()
+          af, bf = norm(am.group(1)), norm(bm.group(1))
+          if af != expected or bf != expected:
+              raise SystemExit(f"Release signature mismatch: APK={af}, AAB={bf}")
+          print("Release APK and AAB both match the prepared Nation Nums production certificate.")
+          PY
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: nation-nums-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload release Android App Bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: nation-nums-release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
       - name: Upload debug App Links fingerprint
         uses: actions/upload-artifact@v6
         with:

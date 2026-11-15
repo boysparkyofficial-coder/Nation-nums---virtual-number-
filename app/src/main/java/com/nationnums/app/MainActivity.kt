@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Wallet
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -287,6 +288,7 @@ private fun NationNumsApp(activity: MainActivity) {
         )
     }
     var gateError by remember { mutableStateOf("") }
+    NativeUpdatePrompt(activity)
     var welcomeUsername by remember { mutableStateOf("") }
     var biometricAvailable by remember { mutableStateOf(
         BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
@@ -1834,5 +1836,84 @@ private fun InfoNotice(text: String) {
             Icon(Icons.Rounded.Shield, contentDescription = null, tint = NationBlue, modifier = Modifier.size(19.dp))
             Text(text, color = Ink, fontSize = 12.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 9.dp))
         }
+    }
+}
+
+
+/**
+ * Checks the public SiteBranding record on every app launch. The popup is
+ * displayed only when the installed Android version is older than the
+ * version configured by the Nation Nums website.
+ */
+@Composable
+private fun NativeUpdatePrompt(activity: MainActivity) {
+    var latestVersion by remember { mutableStateOf<String?>(null) }
+    var downloadUrl by remember { mutableStateOf<String?>(null) }
+    var dismissed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        Base44Api { null }.getEntityRecords(
+            entityName = "SiteBranding",
+            query = mapOf("limit" to "1"),
+            requireAuth = false
+        ) { result ->
+            if (result.success) {
+                runCatching {
+                    val root = org.json.JSONObject(result.body)
+                    val rows = root.optJSONArray("data")
+                        ?: root.optJSONArray("items")
+                        ?: root.optJSONArray("results")
+                        ?: root.optJSONArray("records")
+                    val record = rows?.optJSONObject(0)
+                        ?: root.takeIf { it.has("mobile_app_latest_version") }
+                    val version = record?.optString("mobile_app_latest_version").orEmpty().trim()
+                    val url = (record?.optString("mobile_app_update_url")
+                        ?: record?.optString("mobile_app_download_url")).orEmpty().trim()
+                    if (version.isNotBlank() && url.startsWith("https://")) {
+                        latestVersion = version
+                        downloadUrl = url
+                    }
+                }
+            }
+        }
+    }
+
+    val currentVersion = remember {
+        runCatching {
+            activity.packageManager.getPackageInfo(activity.packageName, 0).versionName.orEmpty()
+        }.getOrDefault("")
+    }
+    val latest = latestVersion.orEmpty()
+    val installedParts = currentVersion.filter { it.isDigit() || it == '.' }.split('.').map { it.toIntOrNull() ?: 0 }
+    val latestParts = latest.filter { it.isDigit() || it == '.' }.split('.').map { it.toIntOrNull() ?: 0 }
+    val isOutdated = latestParts.isNotEmpty() && latestParts.indices.any { index ->
+        val installed = installedParts.getOrElse(index) { 0 }
+        val available = latestParts[index]
+        if (installed != available) installed < available
+        else false
+    } || latestParts.size > installedParts.size &&
+        latestParts.drop(installedParts.size).any { it > 0 }
+
+    if (!dismissed && isOutdated && !downloadUrl.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = { dismissed = true },
+            title = { Text("A new Nation Nums update is available") },
+            text = {
+                Text("Version $latest is ready. Update now to get the latest improvements, or choose Later to continue using the app.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    runCatching {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)))
+                    }
+                    dismissed = true
+                }) { Text("Update") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { dismissed = true }) {
+                    Text("Later")
+                }
+            }
+        )
     }
 }

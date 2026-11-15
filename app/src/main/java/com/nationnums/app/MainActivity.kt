@@ -1862,13 +1862,22 @@ private fun NativeUpdatePrompt(activity: MainActivity) {
             if (result.success) {
                 runCatching {
                     val root = org.json.JSONObject(result.body)
+                    // Base44 responses can wrap records in different envelopes.
+                    // Accept both top-level arrays and nested data/items/results arrays.
+                    val nestedData = root.optJSONObject("data")
                     val rows = root.optJSONArray("data")
                         ?: root.optJSONArray("items")
                         ?: root.optJSONArray("results")
                         ?: root.optJSONArray("records")
+                        ?: nestedData?.optJSONArray("items")
+                        ?: nestedData?.optJSONArray("records")
+                        ?: nestedData?.optJSONArray("results")
                     val candidates = rows?.let { array ->
                         (0 until array.length()).mapNotNull { array.optJSONObject(it) }
-                    }.orEmpty() + listOfNotNull(root.takeIf { it.has("mobile_app_latest_version") })
+                    }.orEmpty() + listOfNotNull(
+                        root.takeIf { it.has("mobile_app_latest_version") },
+                        nestedData?.takeIf { it.has("mobile_app_latest_version") }
+                    )
                     val record = candidates.firstOrNull { candidate ->
                         val version = candidate.optString("mobile_app_latest_version").trim()
                         val update = candidate.optString("mobile_app_update_url").trim()

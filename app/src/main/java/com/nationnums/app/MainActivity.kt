@@ -1854,7 +1854,9 @@ private fun NativeUpdatePrompt(activity: MainActivity) {
     LaunchedEffect(Unit) {
         Base44Api { null }.getEntityRecords(
             entityName = "SiteBranding",
-            query = mapOf("limit" to "1"),
+            // Read a page of records and select the actual configured app-update
+            // record. Do not assume the first SiteBranding row is the right one.
+            query = mapOf("limit" to "100"),
             requireAuth = false
         ) { result ->
             if (result.success) {
@@ -1864,8 +1866,15 @@ private fun NativeUpdatePrompt(activity: MainActivity) {
                         ?: root.optJSONArray("items")
                         ?: root.optJSONArray("results")
                         ?: root.optJSONArray("records")
-                    val record = rows?.optJSONObject(0)
-                        ?: root.takeIf { it.has("mobile_app_latest_version") }
+                    val candidates = rows?.let { array ->
+                        (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+                    }.orEmpty() + listOfNotNull(root.takeIf { it.has("mobile_app_latest_version") })
+                    val record = candidates.firstOrNull { candidate ->
+                        val version = candidate.optString("mobile_app_latest_version").trim()
+                        val update = candidate.optString("mobile_app_update_url").trim()
+                        val download = candidate.optString("mobile_app_download_url").trim()
+                        version.isNotBlank() && (update.startsWith("https://") || download.startsWith("https://"))
+                    }
                     val version = record?.optString("mobile_app_latest_version").orEmpty().trim()
                     val url = record?.optString("mobile_app_update_url").orEmpty().trim()
                         .ifBlank { record?.optString("mobile_app_download_url").orEmpty().trim() }

@@ -1867,8 +1867,8 @@ private fun NativeUpdatePrompt(activity: MainActivity) {
                     val record = rows?.optJSONObject(0)
                         ?: root.takeIf { it.has("mobile_app_latest_version") }
                     val version = record?.optString("mobile_app_latest_version").orEmpty().trim()
-                    val url = (record?.optString("mobile_app_update_url")
-                        ?: record?.optString("mobile_app_download_url")).orEmpty().trim()
+                    val url = record?.optString("mobile_app_update_url").orEmpty().trim()
+                        .ifBlank { record?.optString("mobile_app_download_url").orEmpty().trim() }
                     if (version.isNotBlank() && url.startsWith("https://")) {
                         latestVersion = version
                         downloadUrl = url
@@ -1886,13 +1886,19 @@ private fun NativeUpdatePrompt(activity: MainActivity) {
     val latest = latestVersion.orEmpty()
     val installedParts = currentVersion.filter { it.isDigit() || it == '.' }.split('.').map { it.toIntOrNull() ?: 0 }
     val latestParts = latest.filter { it.isDigit() || it == '.' }.split('.').map { it.toIntOrNull() ?: 0 }
-    val isOutdated = latestParts.isNotEmpty() && latestParts.indices.any { index ->
-        val installed = installedParts.getOrElse(index) { 0 }
-        val available = latestParts[index]
-        if (installed != available) installed < available
-        else false
-    } || latestParts.size > installedParts.size &&
-        latestParts.drop(installedParts.size).any { it > 0 }
+    val isOutdated = run {
+        val count = maxOf(installedParts.size, latestParts.size)
+        var comparison = 0
+        for (index in 0 until count) {
+            val installed = installedParts.getOrElse(index) { 0 }
+            val available = latestParts.getOrElse(index) { 0 }
+            if (installed != available) {
+                comparison = installed.compareTo(available)
+                break
+            }
+        }
+        comparison < 0
+    }
 
     if (!dismissed && isOutdated && !downloadUrl.isNullOrBlank()) {
         AlertDialog(

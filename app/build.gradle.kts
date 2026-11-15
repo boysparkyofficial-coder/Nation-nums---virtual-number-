@@ -13,8 +13,8 @@ android {
         applicationId = "com.base44.nationnums"
         minSdk = 24
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.0.34"
+        versionCode = 25
+        versionName = "1.1.35"
     }
 
     signingConfigs {
